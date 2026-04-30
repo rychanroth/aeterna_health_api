@@ -12,3 +12,9 @@ def medicine_list(request):
     medicines = Medicine.objects.all().order_by('created_at')
     serializer = MedicineSerializer(medicines, many=True)
     return  Response(serializer.data)
+
+@api_view(['GET'])
+def medicine_detail(request, pk):
+    medicine = Medicine.objects.get(pk=pk)
+    serializer = MedicineSerializer(medicine)
+    return Response(serializer.data)
