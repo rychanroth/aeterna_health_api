@@ -4,4 +4,15 @@ from .models import *
 class MedicineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Medicine
-        fields = ['id', 'name', 'description', 'price', 'stock', 'created_at']
+        fields = '__all__'
+
+    # Custom Field Validation
+    def validate_price(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Price must be greater than 0.")
+        return value
+    
+    def validate_stock(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Stock cannot be negative.")
+        return value
