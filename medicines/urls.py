@@ -1,18 +1,7 @@
 from . import views
-from django.urls import path
+from rest_framework.routers import DefaultRouter
 
-urlpatterns = [
-    # Categories
-    path('categories/', views.category_list, name='category-list'),
-    path('categories/<int:pk>/', views.category_detail, name='category-detail'),
-    path('categories/roots/', views.category_roots, name='category-roots'),
-
-    # Suppliers
-    path('suppliers/', views.supplier_list, name='supplier-list'),
-    path('suppliers/<int:pk>/', views.supplier_detail, name='supplier-detail'),
-
-    # Medicines
-    path('medicines/', views.medicine_list, name='medicine-list'),
-    path('medicines/<int:pk>/', views.medicine_detail, name='medicine-detail'),
-
-]
+router = DefaultRouter()
+router.register(r'categories', views.CategoryViewSet, basename='category')
+router.register(r'suppliers', views.SupplierViewSet, basename='supplier')
+router.register(r'medicines', views.MedicineViewSet, basename='medicine')

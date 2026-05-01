@@ -3,7 +3,7 @@ from .serializers import *
 from rest_framework import viewsets
 
 # ModelViewSet automatically provides list(), create(), retrieve(), update(), partial_update(), destroy()
-# With the exception of using Router of course
+# When registered with Router, it dynamically generates the URL PATTERNS!
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
