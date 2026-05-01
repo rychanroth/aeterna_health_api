@@ -4,14 +4,31 @@ from .models import *
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = '__all__'
+        fields = ['id', 'name']
+
+class SupplierSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Supplier
+        fields = ['id', 'name', 'phone', 'address']
 
 class MedicineSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True) # Nested Serializer for GET
-    category_id = serializers.PrimaryKeyRelatedField( # cat_id for PUT, POST, PATCH, DELETE
+    # Nested read-only (GET) for display
+    category = CategorySerializer(read_only=True)
+    suppliers = SupplierSerializer(many=True, read_only=True)
+
+    # Write-only (PUT, POST, PATCH, DELETE) 
+    category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(),
         source='category',
         write_only=True
+    )
+    supplier_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Supplier.objects.all(),
+        source='suppliers',
+        many=True,
+        write_only=True,
+        required=True
     )
 
     class Meta:
