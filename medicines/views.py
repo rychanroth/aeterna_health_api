@@ -34,3 +34,11 @@ class SupplierViewSet(viewsets.ModelViewSet):
 class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
+
+    def get_queryset(self):
+        """Filter medicines by search query"""
+        queryset = Medicine.objects.all()
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+        return queryset
