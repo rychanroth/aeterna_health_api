@@ -53,6 +53,13 @@ def category_detail(request, pk):
         category.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+@api_view(['GET'])
+def category_roots(request):
+    """Get all root category (category that has no parent)"""
+    roots = Category.objects.filter(parent__isnull=True)
+    serializer = CategorySerializer(roots, many=True)
+    return Response(serializer.data)
+
 # === SUPPLIERS VIEWS ===
 @api_view(['GET', 'POST'])
 def supplier_list(request):
