@@ -82,7 +82,7 @@ def medicine_detail(request, pk):
 
     if request.method == 'GET':
         serializer = MedicineSerializer(medicine)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data)
     
     elif request.method == 'PUT':
         serializer = MedicineSerializer(medicine, data=request.data)
