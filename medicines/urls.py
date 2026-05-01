@@ -5,6 +5,7 @@ urlpatterns = [
     # Categories
     path('categories/', views.category_list, name='category-list'),
     path('categories/<int:pk>', views.category_detail, name='category-detail'),
+    path('categories/root/', views.category_roots, name='category-roots'),
 
     # Suppliers
     path('suppliers/', views.supplier_list, name='supplier-list'),
