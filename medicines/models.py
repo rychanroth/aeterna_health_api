@@ -4,6 +4,13 @@ from django.db import models
 
 class Category(models.Model):
     name = models.CharField(max_length=200, unique=True)
+    parent = models.ForeignKey(
+        'self', # foregined itself
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name = 'children' # access subcategories(children) with category.children.all()
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
