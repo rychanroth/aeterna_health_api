@@ -4,12 +4,12 @@ from django.urls import path
 urlpatterns = [
     # Categories
     path('categories/', views.category_list, name='category-list'),
-    path('categories/<int:pk>', views.category_detail, name='category-detail'),
-    path('categories/root/', views.category_roots, name='category-roots'),
+    path('categories/<int:pk>/', views.category_detail, name='category-detail'),
+    path('categories/roots/', views.category_roots, name='category-roots'),
 
     # Suppliers
     path('suppliers/', views.supplier_list, name='supplier-list'),
-    path('suppliers/<int:pk>', views.supplier_detail, name='supplier-detail'),
+    path('suppliers/<int:pk>/', views.supplier_detail, name='supplier-detail'),
 
     # Medicines
     path('medicines/', views.medicine_list, name='medicine-list'),
