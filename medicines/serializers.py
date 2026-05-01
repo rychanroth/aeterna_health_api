@@ -2,9 +2,21 @@ from rest_framework import serializers
 from .models import *
 
 class CategorySerializer(serializers.ModelSerializer):
+    # Read-only
+    parent = serializers.StringRelatedField(read_only=True)
+    
+    # Write-only
+    parent_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        source='parent',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
+
     class Meta:
         model = Category
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'parent', 'parent_id']
 
 class SupplierSerializer(serializers.ModelSerializer):
 
