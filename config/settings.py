@@ -79,11 +79,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.oracle',
-        'NAME': 'XEPDB1',
+        'NAME': 'localhost:1521/XEPDB1', # provide full connect string here means you'll let `HOST` and `PORT` be empty string
         'USER': 'aeterna_health',
         'PASSWORD': 'aub12345', 
-        'HOST': 'localhost',
-        'PORT': 1521
+        'HOST': '',
+        'PORT': '',
     }
 }
 
