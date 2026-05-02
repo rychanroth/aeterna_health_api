@@ -1,7 +1,7 @@
 from .models import *
 from .serializers import *
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import *
@@ -9,6 +9,7 @@ from django.contrib.auth import authenticate
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def login(request):
     """Exchage username/password for auth token"""
     username = request.data.get('username')
