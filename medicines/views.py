@@ -33,6 +33,15 @@ class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated]
 
+    # === Custom Permissions ===
+    def get_permissions(self):
+        """Anyone can view, but only authenticated user can add/update/delete"""
+        if self.action == 'list' or self.action == 'retrieve':
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
     # === Custom Action ===
     # Function name determines the auto-generated url name e.g. /api/categories/roots/
     @action(detail=False, methods=['get'])
@@ -59,6 +68,17 @@ class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
     permission_classes = [IsAuthenticated]
+
+    # === Custom Permissions ===
+
+    def get_permissions(self):
+        # Admin can do all these
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdminUser]
+        else:
+            # Authenticated user could do other than that
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         """Filter medicines by search query"""
