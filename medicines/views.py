@@ -1,8 +1,30 @@
 from .models import *
 from .serializers import *
-from rest_framework import viewsets
-from rest_framework.decorators import action
+from rest_framework import viewsets, status
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import authenticate
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login(request):
+    """Exchage username/password for token"""
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    user =  authenticate(username=username, password=password)
+
+    if user:
+        token, created = Token.objects.get_or_create(user=user)
+        return Response({
+            'token': token.key,
+            'user_id': user.id,
+            'username': user.username
+        })
+    return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
 
 # ModelViewSet automatically provides list(), create(), retrieve(), update(), partial_update(), destroy()
 # When registered with Router, it dynamically generates the URL PATTERNS!
