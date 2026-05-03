@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from decimal import Decimal
 
 # Create your models here.
 
@@ -103,3 +104,48 @@ class Medicine(models.Model):
     @property
     def is_low_stock(self):
         return self.stock_quantity < 10
+
+class Sale(models.Model):
+    sale_number = models.CharField(max_length=30, unique=True)
+    medicine = models.ForeignKey(
+        Medicine,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='sales'
+    )
+    quantity = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    cashier = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='sales'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'sales'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.sale_number
+    
+    def save(self, *args, **kwargs):
+        # Auto-fill price from Medicine if not provided
+        if not self.unit_price and self.medicine:
+            self.unit_price =  self.medicine.selling_price
+
+        # Double type handling
+        if self.quantity and self.unit_price:
+            self.total_price = Decimal(self.quantity) * Decimal(self.unit_price)
+
+        # Stock management logic
+        if not self.pk:
+            if self.medicine and self.medicine.stock_quantity >= self.quantity:
+                self.medicine.stock_quantity -= self.quantity
+                self.medicine.save()
+            else:
+                raise ValueError("Not enough stock available!")
+            
+        super().save(*args, **kwargs)
