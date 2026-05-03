@@ -1,3 +1,5 @@
+from datetime import timedelta
+from django.utils import timezone
 from .models import *
 from .serializers import *
 from rest_framework import viewsets, status
@@ -6,6 +8,8 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import *
 from django.contrib.auth import authenticate
+
+# === AUTHENTICATION ===
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -26,21 +30,33 @@ def login(request):
         })
     return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
+# User ViewSet
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAdminUser] # only Admin can manage users
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """Get current logged-in user info"""
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+
 
 # ModelViewSet automatically provides list(), create(), retrieve(), update(), partial_update(), destroy()
 # When registered with Router, it dynamically generates the URL PATTERNS!
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]
 
     # === Custom Permissions ===
     def get_permissions(self):
         """Anyone can view, but only authenticated user can add/update/delete"""
-        if self.action == 'list' or self.action == 'retrieve':
-            permission_classes = [AllowAny]
-        else:
+        if self.action in ['list', 'retrieve', 'roots', 'medicines']:
             permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdminUser]
         return [permission() for permission in permission_classes]
 
     # === Custom Action ===
@@ -56,7 +72,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def medicines(self, request, pk=None):
         """Get all medicines in this category"""
         category = self.get_object()
-        medicines = category.medicines.all()
+        medicines = category.medicines.filter(is_active=True)
         serializer = MedicineSerializer(medicines, many=True)
         return Response(serializer.data)
 
@@ -65,26 +81,99 @@ class SupplierViewSet(viewsets.ModelViewSet):
     serializer_class = SupplierSerializer
     permission_classes = [IsAuthenticated]
 
+    # Custom Permission
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdminUser]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    # Custom Action
+    @action(detail=True, methods=['get'])
+    def medicines(self, request, pk=None):
+        """Get all medicines from this supplier"""
+        supplier = self.get_object()
+        medicines = supplier.medicines.filter(is_active=True)
+        serializer = MedicineSerializer(medicines, many=True)
+        return Response(serializer.data)
+
+
 class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
     permission_classes = [IsAuthenticated]
 
     # === Custom Permissions ===
-
     def get_permissions(self):
         # Admin can do all these
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             permission_classes = [IsAdminUser]
         else:
-            # Authenticated user could do other than that
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
 
+    # Custom Queryset
     def get_queryset(self):
-        """Filter medicines by search query"""
         queryset = Medicine.objects.all()
+
+        """Filter medicines by search query"""
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(name__icontains=search)
+
+        """Filter medicines by category"""
+        category_id = self.request.query_params.get('category')
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+
+        """Filter medicines by expiration"""
+        expired = self.request.query_params.get('expired')
+        if expired == 'true':
+            queryset = queryset.filter(expiration_date__lt=timezone.now().date())
+        elif expired == 'false':
+            queryset = queryset.filter(expiration_date__gte=timezone.now().date())
+
+        """Filter medicines by low stock"""
+        low_stock = self.request.query_params.get('low_stock')
+        if low_stock == 'true':
+            queryset = queryset.filter(stock_quantity__lt=10) 
+
         return queryset
+    
+    # Custom Logic
+    def perform_create(self, serializer):
+        medicine = serializer.save()
+
+    # Custom Action
+    @action(detail=False, methods=['get'])
+    def expired(self, request):
+        """Get all expired medicines"""
+        expired = self.queryset.filter(
+            expiration_date__lt=timezone.now().date(),
+            is_active=True
+        )
+        serializer = self.get_serializer(expired, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def low_stock(self, request):
+        """Get all medicines with low stock"""
+        low_stock = self.queryset.filter(
+            stock_quantity__lt=10,
+            is_active=True
+        )
+        serializer = self.get_serializer(low_stock, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def expiring_soon(self, request):
+        """Get medicines expiring in the next 30 days"""
+        soon = timezone.now().date() + timedelta(days=30)
+        expiring = self.queryset.filter(
+            expiration_date__lte=soon,
+            expiration_date__gte=timezone.now().date(),
+            is_active=True
+        )
+        serializer = self.get_serializer(expiring, many=True)
+        return Response(serializer.data)
