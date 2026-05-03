@@ -177,3 +177,85 @@ class MedicineViewSet(viewsets.ModelViewSet):
         )
         serializer = self.get_serializer(expiring, many=True)
         return Response(serializer.data)
+    
+class SaleViewSet(viewsets.ModelViewSet):
+    queryset = Sale.objects.all()
+    serializer_class = SaleSerializer
+    permission_classes = [IsAuthenticated]
+    
+    # Custom Queryset
+    def get_queryset(self):
+        queryset = Sale.objects.all()
+
+        """Filter sales by date range"""
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(created_at__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__lte=end_date)
+
+        """Filter sales by cashier"""
+        cashier_id = self.request.query_params.get('cashier')
+        if cashier_id:
+            queryset = queryset.filter(cashier_id=cashier_id)
+
+        """Filter sales by medicines"""
+        medicine_id = self.request.query_params.get('medicine')
+        if medicine_id:
+            queryset = queryset.filter(medicine_id=medicine_id)
+
+        return queryset
+    
+    # Custom Logic
+    def perform_create(self, serializer):
+        serializer.save(cashier=self.request.user)
+
+    # Custom Actions
+    @action(detail=False, methods=['get'])
+    def today(self, request):
+        """Get today's sales"""
+        today = timezone.now().date()
+        sales = self.queryset.filter(created_at__date=today)
+        serializer = self.get_serializer(sales, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def my_sales(self, request):
+        """Get current cashier's sales"""
+        sales = self.queryset.filter(cashier=request.user)
+        serializer = self.get_serializer(sales, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def report(self, request):
+        """Get sales summary report"""
+        from django.db.models import Sum, Count
+
+        today = timezone.now().date()
+
+        # Today's statistic
+        today_sales = Sale.objects.filter(created_at__date=today)
+        today_total = today_sales.aggregate(
+            total=Sum('total_price'),
+            count=Count('id')
+        )
+
+        # This month's statistic
+        month_start = today.replace(day=1)
+        month_sales = Sale.objects.filter(created_at__date__gte=month_start)
+        month_total = month_sales.aggregate(
+            total=Sum('total_price'),
+            count=Count('id')
+        )
+
+        return Response({
+            'today': {
+                'total_sales': today_total['total'] or 0,
+                'transaction_count': today_total['count'] or 0
+            },
+            'this_month': {
+                'total_sales': month_total['total'] or 0,
+                'transaction_count': month_total['count'] or 0
+            }
+        })
