@@ -76,3 +76,21 @@ class MedicineSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("Stock cannot be negative.")
         return value
+
+class SaleSerializer(serializers.ModelSerializer):
+    medicine_name = serializers.ReadOnlyField(source='medicine.name')
+    cashier_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Sale
+        fields = [
+            'id', 'sale_number', 'medicine', 'medicine_name',
+            'quantity', 'unit_price', 'total_price', 
+            'cashier', 'cashier_name', 'created_at'
+        ]
+        read_only_fields = ['id', 'sale_number', 'total_price', 'cashier'] 
+
+    def get_cashier_name(self, obj):
+        if obj.cashier:
+            return obj.cashier.get_full_name() or obj.cashier.username
+        return None
