@@ -197,6 +197,13 @@ class SaleItem(models.Model):
 
 class Prescription(models.Model):
     prescription_number = models.CharField(max_length=30) # TODO: Implement auto number id generation
+    doctor = models.ForeignKey(
+        'Doctor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='prescriptions'
+    )
 
     class Meta:
         db_table = 'prescriptions'
