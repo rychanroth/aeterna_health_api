@@ -106,22 +106,28 @@ class Medicine(models.Model):
         return self.stock_quantity < 10
 
 class Sale(models.Model):
+    class PaymentMethod(models.TextChoices):
+        CASH = 'cash', 'Cash'
+        CARD = 'card', 'Card'
+        INSURANCE = 'insurance', 'Insurance'
+
     sale_number = models.CharField(max_length=30, unique=True)
-    medicine = models.ForeignKey(
-        Medicine,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='sales'
-    )
-    quantity = models.IntegerField()
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-    total_price = models.DecimalField(max_digits=10, decimal_places=2)
     cashier = models.ForeignKey(
-        User,
+        'User',
         on_delete=models.SET_NULL,
         null=True,
         related_name='sales'
     )
+    prescription = models.ForeignKey(
+        'Prescription',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sales'
+    )
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
+    notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -131,6 +137,25 @@ class Sale(models.Model):
     def __str__(self):
         return self.sale_number
     
+class SaleItem(models.Model):
+    sale = models.ForeignKey(
+        'Sale', 
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    medicine = models.ForeignKey(
+        'Medicine',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='sale_items'
+    )
+    quantity = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = 'sale_items'
+    
     def save(self, *args, **kwargs):
         # Auto-fill price from Medicine if not provided
         if not self.unit_price and self.medicine:
@@ -138,7 +163,7 @@ class Sale(models.Model):
 
         # Double type handling
         if self.quantity and self.unit_price:
-            self.total_price = Decimal(self.quantity) * Decimal(self.unit_price)
+            self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
 
         # Stock management logic
         if not self.pk:
@@ -149,3 +174,6 @@ class Sale(models.Model):
                 raise ValueError("Not enough stock available!")
             
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.sale.sale_number} - {self.medicine}"
