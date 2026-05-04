@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import *
 from django.contrib.auth import authenticate
+from django.db import models
 
 # === AUTHENTICATION ===
 
@@ -254,3 +255,33 @@ class SaleViewSet(viewsets.ModelViewSet):
                 'transaction_count': month_total['count'] or 0
             }
         })
+
+class DoctorViewSet(viewsets.ModelViewSet):
+    queryset = Doctor.objects.all()
+    serializer_class = DoctorSerializer
+
+    def get_queryset(self):
+        queryset = Doctor.objects.all()
+
+        # Search by name or license
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                models.Q(name__icontains=search) |
+                models.Q(license_number__icontains=search)
+            )
+
+        # Filter
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        return queryset
+    
+    def get_permissions(self):
+        """Only admin and pharmacist can manage doctors"""
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
