@@ -148,3 +148,18 @@ class SaleSerializer(serializers.ModelSerializer):
                 SaleItem.objects.create(sale=instance, **item_data)
 
         return instance
+
+class DoctorSerializer(serializers.ModelSerializer):
+    prescription_count = serializers.SerializerMethodField()
+    class Meta:
+        model = Doctor
+        fields = [
+            'id', 'name', 'license_number', 'phone',
+            'clinic_name', 'clinic_address',
+            'is_active', 'prescription_count', 'created_at'
+        ]
+        read_only_fields = []
+
+    def get_prescription_count(self, obj):
+        """Count all prescriptions of a doctor"""
+        return obj.prescriptions.count()    
