@@ -77,26 +77,9 @@ class MedicineSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Stock cannot be negative.")
         return value
 
-class SaleSerializer(serializers.ModelSerializer):
-    medicine_name = serializers.ReadOnlyField(source='medicine.name')
-    cashier_name = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Sale
-        fields = [
-            'id', 'sale_number', 'medicine', 'medicine_name',
-            'quantity', 'unit_price', 'total_price', 
-            'cashier', 'cashier_name', 'created_at'
-        ]
-        read_only_fields = ['id', 'sale_number', 'total_price', 'cashier'] 
-
-    def get_cashier_name(self, obj):
-        if obj.cashier:
-            return obj.cashier.get_full_name() or obj.cashier.username
-        return None
 class SaleItemSerializer(serializers.ModelSerializer):
-    medicine_name = serializers.ReadOnlyField('medicine.name')
-    medicine = serializers.PrimaryKeyRelatedField(
+    medicine_name = serializers.ReadOnlyField(source='medicine.name')
+    medicine_id = serializers.PrimaryKeyRelatedField(
         queryset=Medicine.objects.all(),
         source='medicine',
         write_only=True
@@ -105,7 +88,69 @@ class SaleItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = SaleItem
         fields = [
-            'id', 'medicine', 'medicine_name', 'medicine_id',
+            'id', 'medicine_name', 'medicine_id',
             'quantity', 'unit_price', 'subtotal',
         ]
         read_only_fields = ['id', 'subtotal']
+
+class SaleSerializer(serializers.ModelSerializer):
+    items = SaleItemSerializer(many=True)
+    cashier_name = serializers.SerializerMethodField()
+    prescription_id = serializers.PrimaryKeyRelatedField(
+        queryset=Prescription.objects.all(),
+        source='prescription',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
+
+    class Meta:
+        model = Sale
+        fields = [
+            'id', 'sale_number', 'cashier', 'cashier_name',
+            'prescription', 'prescription_id',
+            'items', 'total_amount', 'payment_method',
+            'notes', 'created_at',
+        ]
+        read_only_fields = ['id', 'sale_number', 'total_amount', 'cashier'] 
+
+    def get_cashier_name(self, obj):
+        if obj.cashier:
+            return obj.cashier.get_full_name() or obj.cashier.username
+        return None
+    
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+
+        # Generate sales number
+        import datetime
+        today = datetime.date.today()
+        count = Sale.objects.filter(created_at__date=today).count()+1
+        validated_data['sale_number'] = f"INV-{today.strftime('%Y%m%d')}-{count:04d}"
+
+        # Create sale
+        sale = Sale.objects.create(**validated_data)
+
+        # Create items
+        for item_data in items_data:
+            SaleItem.objects.create(sale=sale, **item_data)
+
+        return sale
+    
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+
+        # Update sale fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update items if provided
+        if items_data is not None:
+            # Delete existing items
+            instance.items.all().delete()
+            # Create new items
+            for item_data in items_data:
+                SaleItem.objects.create(sale=instance, **item_data)
+
+        return instance

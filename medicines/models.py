@@ -167,7 +167,7 @@ class SaleItem(models.Model):
 
         # Double type handling
         if self.quantity and self.unit_price:
-            self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
+            self.subtotal = Decimal(str(self.quantity)) * Decimal(str(self.unit_price))
 
         # Stock management logic
         if not self.pk:
