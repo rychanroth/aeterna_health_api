@@ -9,6 +9,7 @@ router.register(r'suppliers', views.SupplierViewSet, basename='supplier')
 router.register(r'medicines', views.MedicineViewSet, basename='medicine')
 router.register(r'sales', views.SaleViewSet, basename='sale')
 router.register(r'doctors', views.DoctorViewSet, basename='doctor')
+router.register(r'patients', views.PatientViewSet, basename='patient')
 
 urlpatterns = [
     path('login/', views.login, name="login")
