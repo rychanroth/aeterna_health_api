@@ -194,20 +194,6 @@ class SaleItem(models.Model):
     def __str__(self):
         return f"{self.sale.sale_number} - {self.medicine}"
 
-
-class Prescription(models.Model):
-    prescription_number = models.CharField(max_length=30) # TODO: Implement auto number id generation
-    doctor = models.ForeignKey(
-        'Doctor',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='prescriptions'
-    )
-
-    class Meta:
-        db_table = 'prescriptions'
-
 # === Doctor and Patient ===
 class Doctor(models.Model):
     name = models.CharField(max_length=150)
@@ -224,3 +210,58 @@ class Doctor(models.Model):
 
     def __str__(self):
         return self.name
+    
+class Patient(models.Model):
+    class Gender(models.TextChoices):
+        MALE = 'male', 'Male'
+        FEMALE = 'female', 'Female'
+        OTHER = 'other', 'Other'
+
+    name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=30, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(
+        max_length=10,
+        choices=Gender.choices,
+        blank=True
+    )
+    address = models.CharField(max_length=300, blank=True)
+    allergy_notes = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'patients'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+    
+    @property
+    def age(self):
+        """Calculate age from date_of_birth"""
+        if self.date_of_birth:
+            from django.utils import timezone
+            today = timezone.now().date()
+            return today.year - self.date_of_birth.year  - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
+        return None
+
+class Prescription(models.Model):
+    prescription_number = models.CharField(max_length=30) # TODO: Implement auto number id generation
+    doctor = models.ForeignKey(
+        'Doctor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='prescriptions'
+    )
+    patient = models.ForeignKey(
+        'Patient',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='prescriptions'
+    )
+
+    class Meta:
+        db_table = 'prescriptions'
