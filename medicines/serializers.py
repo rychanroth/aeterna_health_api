@@ -163,3 +163,19 @@ class DoctorSerializer(serializers.ModelSerializer):
     def get_prescription_count(self, obj):
         """Count all prescriptions of a doctor"""
         return obj.prescriptions.count()    
+    
+class PatientSerializer(serializers.ModelSerializer):
+    age = serializers.ReadOnlyField()
+    prescription_count = serializers.SerializerMethodField()
+    class Meta:
+        model = Patient
+        fields = [
+            'id', 'name', 'phone', 'date_of_birth', 'age',
+            'gender', 'address', 'allergy_notes',
+            'is_active', 'prescription_count', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_prescription_count(self, obj):
+        """Count all prescriptions of the patient"""
+        return obj.prescriptions.count()
