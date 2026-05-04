@@ -200,11 +200,6 @@ class SaleViewSet(viewsets.ModelViewSet):
         if cashier_id:
             queryset = queryset.filter(cashier_id=cashier_id)
 
-        """Filter sales by medicines"""
-        medicine_id = self.request.query_params.get('medicine')
-        if medicine_id:
-            queryset = queryset.filter(medicine_id=medicine_id)
-
         return queryset
     
     # Custom Logic
