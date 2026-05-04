@@ -200,3 +200,20 @@ class Prescription(models.Model):
 
     class Meta:
         db_table = 'prescriptions'
+
+# === Doctor and Patient ===
+class Doctor(models.Model):
+    name = models.CharField(max_length=150)
+    license_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    phone = models.CharField(max_length=30, blank=True)
+    clinic_name = models.CharField(max_length=200, blank=True)
+    clinic_address = models.CharField(max_length=300, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'doctors'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
