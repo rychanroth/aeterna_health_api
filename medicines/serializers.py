@@ -122,12 +122,6 @@ class SaleSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items')
 
-        # Generate sales number
-        import datetime
-        today = datetime.date.today()
-        count = Sale.objects.filter(created_at__date=today).count()+1
-        validated_data['sale_number'] = f"INV-{today.strftime('%Y%m%d')}-{count:04d}"
-
         # Create sale
         sale = Sale.objects.create(**validated_data)
 
