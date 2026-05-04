@@ -94,3 +94,18 @@ class SaleSerializer(serializers.ModelSerializer):
         if obj.cashier:
             return obj.cashier.get_full_name() or obj.cashier.username
         return None
+class SaleItemSerializer(serializers.ModelSerializer):
+    medicine_name = serializers.ReadOnlyField('medicine.name')
+    medicine = serializers.PrimaryKeyRelatedField(
+        queryset=Medicine.objects.all(),
+        source='medicine',
+        write_only=True
+    )
+
+    class Meta:
+        model = SaleItem
+        fields = [
+            'id', 'medicine', 'medicine_name', 'medicine_id',
+            'quantity', 'unit_price', 'subtotal',
+        ]
+        read_only_fields = ['id', 'subtotal']

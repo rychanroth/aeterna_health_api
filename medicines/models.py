@@ -111,7 +111,7 @@ class Sale(models.Model):
         CARD = 'card', 'Card'
         INSURANCE = 'insurance', 'Insurance'
 
-    sale_number = models.CharField(max_length=30, unique=True)
+    sale_number = models.CharField(max_length=30, unique=True) # TODO: Implement auto number id generation
     cashier = models.ForeignKey(
         'User',
         on_delete=models.SET_NULL,
@@ -187,7 +187,7 @@ class SaleItem(models.Model):
 
 
 class Prescription(models.Model):
-    prescription_number = models.CharField(max_length=30)
+    prescription_number = models.CharField(max_length=30) # TODO: Implement auto number id generation
 
     class Meta:
         db_table = 'prescriptions'
