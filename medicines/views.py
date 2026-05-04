@@ -259,6 +259,7 @@ class SaleViewSet(viewsets.ModelViewSet):
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = Doctor.objects.all()
@@ -285,3 +286,33 @@ class DoctorViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+    
+class PatientViewSet(viewsets.ModelViewSet):
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Patient.objects.all()
+
+        # Search by name or phone 
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                models.Q(name__icontains=search) |
+                models.Q(phone__icontains=search)
+            )
+
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        return queryset
+    
+    @action(detail=False, methods=['get'])
+    def with_allergies(self, request):
+        """Get patients who have allegy notes"""
+        patients = self.get_queryset().exclude(allergy_notes='')
+        serializer = self.get_serializer(patients, many=True)
+        return Response(serializer.data)
