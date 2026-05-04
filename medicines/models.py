@@ -137,6 +137,10 @@ class Sale(models.Model):
     def __str__(self):
         return self.sale_number
     
+    def calculate_total(self):
+        """Sum total of all items subtotal"""
+        return sum(item.subtotal for item in self.items.all())
+    
 class SaleItem(models.Model):
     sale = models.ForeignKey(
         'Sale', 
@@ -172,8 +176,18 @@ class SaleItem(models.Model):
                 self.medicine.save()
             else:
                 raise ValueError("Not enough stock available!")
-            
         super().save(*args, **kwargs)
+            
+        # Update total_amount field in Sale
+        self.sale.total_amount = self.sale.calculate_total()
+        self.sale.save(update_fields=['total_amount'])    
 
     def __str__(self):
         return f"{self.sale.sale_number} - {self.medicine}"
+
+
+class Prescription(models.Model):
+    prescription_number = models.CharField(max_length=30)
+
+    class Meta:
+        db_table = 'prescriptions'
