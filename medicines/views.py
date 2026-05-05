@@ -316,3 +316,86 @@ class PatientViewSet(viewsets.ModelViewSet):
         patients = self.get_queryset().exclude(allergy_notes='')
         serializer = self.get_serializer(patients, many=True)
         return Response(serializer.data)
+
+class PrescriptionViewSet(viewsets.ModelViewSet):
+    queryset = Prescription.objects.all()
+    serializer_class = PrescriptionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Prescription.objects.all()
+
+        # Filter by status
+        status = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
+
+        # Filter by patient
+        patient_id = self.request.query_params.get('patient')
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        
+        # Filter by doctor
+        doctor_id = self.request.query_params.get('doctor')
+        if doctor_id:
+            queryset = queryset.filter(doctor_id=doctor_id)
+        
+        # Filter by date range
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(prescription_date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(prescription_date__lte=end_date)
+
+        return queryset
+    
+    @action(detail=True, methods=['post'])
+    def verify(self, request, pk=None):
+        """Verify a prescription (pharmacist only)"""
+        prescription = self.get_object()
+        
+        if prescription.status != Prescription.Status.PENDING:
+            return Response(
+                {'error': 'Only pending prescriptions can be verified'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        prescription.status = Prescription.Status.VERIFIED
+        prescription.verified_by = request.user
+        prescription.save()
+        
+        serializer = self.get_serializer(prescription)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a prescription (pharmacist only)"""
+        prescription = self.get_object()
+        
+        if prescription.status != Prescription.Status.PENDING:
+            return Response(
+                {'error': 'Only pending prescriptions can be rejected'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        prescription.status = Prescription.Status.REJECTED
+        prescription.verified_by = request.user
+        prescription.save()
+        
+        serializer = self.get_serializer(prescription)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        """Get all pending prescriptions"""
+        pending = self.get_queryset().filter(status=Prescription.Status.PENDING)
+        serializer = self.get_serializer(pending, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def verified(self, request):
+        """Get all verified prescriptions"""
+        verified = self.get_queryset().filter(status=Prescription.Status.VERIFIED)
+        serializer = self.get_serializer(verified, many=True)
+        return Response(serializer.data)
