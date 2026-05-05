@@ -284,6 +284,14 @@ class Prescription(models.Model):
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            import datetime
+            today = datetime.date.today() 
+            count = Prescription.objects.filter(created_at__date=today).count()+1
+            self.prescription_number = f"RX-{today.strftime('%Y%m%d')}-{count:04d}"
+        return super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'prescriptions'
         ordering = ['-created_at']
