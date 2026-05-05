@@ -182,7 +182,7 @@ class PatientSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
-    medicine_name = serializers.ReadOnlyField('medicine.name')
+    medicine_name = serializers.ReadOnlyField(source='medicine.name')
     medicine_id = serializers.PrimaryKeyRelatedField(
         queryset=Medicine.objects.all(),
         source='medicine',
@@ -199,8 +199,8 @@ class PrescriptionItemSerializer(serializers.ModelSerializer):
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     items = PrescriptionItemSerializer(many=True)
-    doctor_name = serializers.ReadOnlyField('doctor.name')
-    patient_name = serializers.ReadOnlyField('patient.name')
+    doctor_name = serializers.ReadOnlyField(source='doctor.name')
+    patient_name = serializers.ReadOnlyField(source='patient.name')
     verified_by_name = serializers.SerializerMethodField()
     doctor_id = serializers.PrimaryKeyRelatedField(
         queryset=Doctor.objects.all(),
