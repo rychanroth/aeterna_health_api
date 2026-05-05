@@ -111,7 +111,7 @@ class Sale(models.Model):
         CARD = 'card', 'Card'
         INSURANCE = 'insurance', 'Insurance'
 
-    sale_number = models.CharField(max_length=30, unique=True) # TODO: Implement auto number id generation
+    sale_number = models.CharField(max_length=30, unique=True)
     cashier = models.ForeignKey(
         'User',
         on_delete=models.SET_NULL,
@@ -247,7 +247,13 @@ class Patient(models.Model):
         return None
 
 class Prescription(models.Model):
-    prescription_number = models.CharField(max_length=30) # TODO: Implement auto number id generation
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        VERIFIED = 'verified', 'Verified'
+        DISPENSED = 'dispensed', 'Dispensed'
+        REJECTED = 'rejected', 'Rejected'
+
+    prescription_number = models.CharField(max_length=30, unique=True)
     doctor = models.ForeignKey(
         'Doctor',
         on_delete=models.SET_NULL,
@@ -262,6 +268,48 @@ class Prescription(models.Model):
         blank=True,
         related_name='prescriptions'
     )
+    prescription_date = models.DateField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    verified_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_prescriptions'
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'prescriptions'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.prescription_number
+    
+class PrescriptionItem(models.Model):
+    prescription = models.ForeignKey(
+        'Prescription',
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    medicine = models.ForeignKey(
+        'Medicine',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='prescription_items'
+    )
+    quantity_prescribed = models.PositiveIntegerField()
+    dosage_instruction = models.CharField(max_length=200, blank=True)
+    is_dispensed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'prescription_items'
+
+    def __str__(self):
+        medicine_name = self.medicine.name if self.medicine else "Unknown Medicine"
+        return f"{self.prescription.prescription_number} - {medicine_name}"
