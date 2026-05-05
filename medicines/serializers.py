@@ -216,9 +216,9 @@ class PrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Prescription
         fields = [
-            'id', 'prescription', 'doctor', 'doctor_name', 'doctor_id',
+            'id', 'prescription_number', 'doctor', 'doctor_name', 'doctor_id',
             'patient', 'patient_name', 'patient_id',
-            'prescription_date', 'status,'
+            'prescription_date', 'status',
             'verified_by', 'verified_by_name',
             'items', 'notes', 'created_at'
         ]
@@ -226,7 +226,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
 
     def get_verified_by_name(self, obj):
         if obj.verified_by:
-            return obj.verifed_by.get_full_name() or obj.verified_by.username
+            return obj.verified_by.get_full_name() or obj.verified_by.username
         return None
     
     def create(self, validated_data):

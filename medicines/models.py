@@ -312,7 +312,7 @@ class PrescriptionItem(models.Model):
         related_name='prescription_items'
     )
     quantity_prescribed = models.PositiveIntegerField()
-    dosage_instruction = models.CharField(max_length=200, blank=True)
+    dosage_instructions = models.CharField(max_length=200, blank=True)
     is_dispensed = models.BooleanField(default=False)
 
     class Meta:
