@@ -179,3 +179,85 @@ class PatientSerializer(serializers.ModelSerializer):
     def get_prescription_count(self, obj):
         """Count all prescriptions of the patient"""
         return obj.prescriptions.count()
+
+
+class PrescriptionItemSerializer(serializers.ModelSerializer):
+    medicine_name = serializers.ReadOnlyField('medicine.name')
+    medicine_id = serializers.PrimaryKeyRelatedField(
+        queryset=Medicine.objects.all(),
+        source='medicine',
+        write_only=True
+    )
+
+    class Meta:
+        model = PrescriptionItem
+        fields = [
+            'id', 'medicine', 'medicine_name', 'medicine_id',
+            'quantity_prescribed', 'dosage_instructions', 'is_dispensed'
+        ]
+        read_only_fields = ['id', 'is_dispensed']
+
+class PrescriptionSerializer(serializers.ModelSerializer):
+    items = PrescriptionItemSerializer(many=True)
+    doctor_name = serializers.ReadOnlyField('doctor.name')
+    patient_name = serializers.ReadOnlyField('patient.name')
+    verified_by_name = serializers.SerializerMethodField()
+    doctor_id = serializers.PrimaryKeyRelatedField(
+        queryset=Doctor.objects.all(),
+        source='doctor',
+        write_only=True
+    )
+    patient_id = serializers.PrimaryKeyRelatedField(
+        queryset=Patient.objects.all(),
+        source='patient',
+        write_only=True
+    )
+
+    class Meta:
+        model = Prescription
+        fields = [
+            'id', 'prescription', 'doctor', 'doctor_name', 'doctor_id',
+            'patient', 'patient_name', 'patient_id',
+            'prescription_date', 'status,'
+            'verified_by', 'verified_by_name',
+            'items', 'notes', 'created_at'
+        ]
+        read_only_fields = ['id', 'prescription_number', 'verified_by']
+
+    def get_verified_by_name(self, obj):
+        if obj.verified_by:
+            return obj.verifed_by.get_full_name() or obj.verified_by.username
+        return None
+    
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        import datetime
+        today = datetime.date.today()
+        # Set default prescription_date if not provided
+        if 'prescription_date' not in validated_data:
+            validated_data['prescription_date'] = today
+        
+        # Create prescription
+        prescription = Prescription.objects.create(**validated_data)
+        
+        # Create items
+        for item_data in items_data:
+            PrescriptionItem.objects.create(prescription=prescription, **item_data)
+        
+        return prescription
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        
+        # Update prescription fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update items if provided
+        if items_data is not None:
+            instance.items.all().delete()
+            for item_data in items_data:
+                PrescriptionItem.objects.create(prescription=instance, **item_data)
+        
+        return instance
