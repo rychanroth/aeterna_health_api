@@ -49,6 +49,7 @@ class MedicineSerializer(serializers.ModelSerializer):
     # Nested read-only (GET) for display
     category = CategorySerializer(read_only=True)
     suppliers = SupplierSerializer(many=True, read_only=True)
+    product_type = ProductTypeSerializer(read_only=True)
 
     # Write-only (PUT, POST, PATCH, DELETE) 
     category_id = serializers.PrimaryKeyRelatedField(
@@ -61,7 +62,14 @@ class MedicineSerializer(serializers.ModelSerializer):
         source='suppliers',
         many=True,
         write_only=True,
-        required=True
+        required=False
+    )
+    product_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProductType.objects.all(),
+        source='product_type',
+        write_only=True,
+        allow_null=True,
+        required=False
     )
     is_expired = serializers.ReadOnlyField()
     is_low_stock = serializers.ReadOnlyField()
@@ -69,8 +77,10 @@ class MedicineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Medicine
         fields = [
-            'id', 'name', 'category', 'category_id',
-            'suppliers', 'supplier_ids',
+            'id', 'name', 
+            'product_type', 'product_type_id', 'base_unit',
+            'category', 'category_id',
+            'suppliers', 'supplier_ids', 'description',
             'selling_price', 'stock_quantity',
             'expiration_date', 'requires_prescription',
             'is_active', 'is_expired', 'is_low_stock',
