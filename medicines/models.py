@@ -79,16 +79,38 @@ class ProductType(models.Model):
         return self.name
 
 class Medicine(models.Model):
+    class BaseUnit(models.TextChoices):
+        TABLET = 'tablet', 'Tablet'
+        CAPSULE = 'capsule', 'Capsule'
+        ML = 'ml', 'Milliliter (mL)'
+        G = 'g', 'Gram (g)'
+        MG = 'mg', 'Milligram (mg)'
+        PIECE = 'piece', 'Piece'
+        TUBE = 'tube', 'Tube'
+        BOTTLE = 'bottle', 'Bottle'
+
     name = models.CharField(max_length=200)
-    suppliers = models.ManyToManyField(
-        Supplier,
+    product_type = models.ForeignKey(
+        'ProductType',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='medicines'
     )
+    base_unit = models.CharField(
+        max_length=20,
+        choices=BaseUnit.choices,
+        default=BaseUnit.TABLET
+    )
     category = models.ForeignKey(
-        Category,
+        'Category',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
+        related_name='medicines'
+    )
+    suppliers = models.ManyToManyField(
+        'Supplier',
         blank=True,
         related_name='medicines'
     )
