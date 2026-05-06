@@ -447,3 +447,14 @@ class StockMovement(models.Model):
             self.MovementType.ADJUSTMENT_OUT
         ]
     
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+    
+        # Update medicine stock on the movement
+        if is_new and self.medicine:
+            if self.is_stock_in:
+                self.medicine.stock_quantity += self.quantity
+            else:
+                self.medicine.stock_quantity -= self.quantity
+            self.medicine.save(update_fields=['stock_quantity'])
