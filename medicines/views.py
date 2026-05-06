@@ -399,3 +399,128 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         verified = self.get_queryset().filter(status=Prescription.Status.VERIFIED)
         serializer = self.get_serializer(verified, many=True)
         return Response(serializer.data)
+    
+
+# StockMovements
+class StockMovementViewSet(viewsets.ModelViewSet):
+    queryset = StockMovement.objects.all()
+    serializer_class = StockMovementSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = StockMovement.objects.all()
+        
+        # Filter by medicine
+        medicine_id = self.request.query_params.get('medicine')
+        if medicine_id:
+            queryset = queryset.filter(medicine_id=medicine_id)
+        
+        # Filter by movement type
+        movement_type = self.request.query_params.get('movement_type')
+        if movement_type:
+            queryset = queryset.filter(movement_type=movement_type)
+        
+        # Filter by IN/OUT
+        direction = self.request.query_params.get('direction')
+        if direction == 'in':
+            queryset = queryset.filter(
+                movement_type__in=[
+                    StockMovement.MovementType.PURCHASE,
+                    StockMovement.MovementType.RETURN_CUSTOMER,
+                    StockMovement.MovementType.ADJUSTMENT_IN
+                ]
+            )
+        elif direction == 'out':
+            queryset = queryset.filter(
+                movement_type__in=[
+                    StockMovement.MovementType.SALE,
+                    StockMovement.MovementType.EXPIRED,
+                    StockMovement.MovementType.DAMAGED,
+                    StockMovement.MovementType.RETURN_SUPPLIER,
+                    StockMovement.MovementType.ADJUSTMENT_OUT
+                ]
+            )
+        
+        # Filter by date range
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+        
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def stock_in(self, request):
+        """Get all stock IN movements"""
+        movements = self.queryset.filter(
+            movement_type__in=[
+                StockMovement.MovementType.PURCHASE,
+                StockMovement.MovementType.RETURN_CUSTOMER,
+                StockMovement.MovementType.ADJUSTMENT_IN
+            ]
+        )
+        serializer = self.get_serializer(movements, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stock_out(self, request):
+        """Get all stock OUT movements"""
+        movements = self.queryset.filter(
+            movement_type__in=[
+                StockMovement.MovementType.SALE,
+                StockMovement.MovementType.EXPIRED,
+                StockMovement.MovementType.DAMAGED,
+                StockMovement.MovementType.RETURN_SUPPLIER,
+                StockMovement.MovementType.ADJUSTMENT_OUT
+            ]
+        )
+        serializer = self.get_serializer(movements, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get stock movement summary"""
+        from django.db.models import Sum
+        
+        medicine_id = request.query_params.get('medicine')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        queryset = StockMovement.objects.all()
+        
+        if medicine_id:
+            queryset = queryset.filter(medicine_id=medicine_id)
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+        
+        # Calculate totals
+        stock_in_types = [
+            StockMovement.MovementType.PURCHASE,
+            StockMovement.MovementType.RETURN_CUSTOMER,
+            StockMovement.MovementType.ADJUSTMENT_IN
+        ]
+        stock_out_types = [
+            StockMovement.MovementType.SALE,
+            StockMovement.MovementType.EXPIRED,
+            StockMovement.MovementType.DAMAGED,
+            StockMovement.MovementType.RETURN_SUPPLIER,
+            StockMovement.MovementType.ADJUSTMENT_OUT
+        ]
+        
+        total_in = queryset.filter(
+            movement_type__in=stock_in_types
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        
+        total_out = queryset.filter(
+            movement_type__in=stock_out_types
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        
+        return Response({
+            'total_in': total_in,
+            'total_out': total_out,
+            'net_change': total_in - total_out
+        })

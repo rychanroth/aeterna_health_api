@@ -261,3 +261,79 @@ class PrescriptionSerializer(serializers.ModelSerializer):
                 PrescriptionItem.objects.create(prescription=instance, **item_data)
         
         return instance
+    
+
+class StockMovementSerializer(serializers.ModelSerializer):
+    medicine_name = serializers.ReadOnlyField(source='medicine.name')
+    medicine_id = serializers.PrimaryKeyRelatedField(
+        queryset=Medicine.objects.all(),
+        source='medicine',
+        write_only=True
+    )
+    created_by_name = serializers.SerializerMethodField()
+    is_stock_in = serializers.ReadOnlyField()
+    is_stock_out = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = StockMovement
+        fields = [
+            'id', 'medicine', 'medicine_name', 'medicine_id',
+            'movement_type', 'quantity', 'unit_cost',
+            'reference', 'notes',
+            'created_by', 'created_by_name',
+            'is_stock_in', 'is_stock_out',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at']
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username or 'Deleted User'
+        return None
+
+    def validate_quantity(self, value):
+        """Ensure quantity is positive"""
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than 0")
+        return value
+
+    def validate(self, data):
+        """Validate stock out movements have enough stock"""
+        medicine = data.get('medicine')
+        movement_type = data.get('movement_type')
+        quantity = data.get('quantity')
+        
+        # Check stock for OUT movements
+        if movement_type and quantity:
+            movement_types_out = [
+                StockMovement.MovementType.SALE,
+                StockMovement.MovementType.EXPIRED,
+                StockMovement.MovementType.DAMAGED,
+                StockMovement.MovementType.RETURN_SUPPLIER,
+                StockMovement.MovementType.ADJUSTMENT_OUT
+            ]
+            
+            if movement_type in movement_types_out:
+                if medicine.stock_quantity < quantity:
+                    raise serializers.ValidationError(
+                        f"Insufficient stock. Available: {medicine.stock_quantity}"
+                    )
+        
+        return data
+
+    def create(self, validated_data):
+        # Auto-set created_by
+        validated_data['created_by'] = self.context['request'].user
+        
+        # Create the movement
+        movement = super().create(validated_data)
+        
+        # Update medicine stock
+        medicine = movement.medicine
+        if movement.is_stock_in:
+            medicine.stock_quantity += movement.quantity
+        else:
+            medicine.stock_quantity -= movement.quantity
+        medicine.save(update_fields=['stock_quantity'])
+        
+        return movement
