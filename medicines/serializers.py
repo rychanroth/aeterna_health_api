@@ -114,6 +114,27 @@ class SaleItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'subtotal']
 
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than 0")
+        return value
+    
+    def validate(self, data):
+        medicine = data.get('medicine')
+        quantity = data.get('quantity')
+
+        if medicine and quantity:
+            if medicine.stock_quantity < quantity:
+                raise serializers.ValidationError(
+                    f"Insufficient stock available: {medicine.stoc_quantity} {medicine.base_unit}(s)"
+                )
+            if medicine.is_expired:
+                raise serializers.ValidationError(
+                    f"Cannot sell expired medicines. Expired on {medicine.expiration_date}"
+                )
+        return data
+        
+
 class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True)
     cashier_name = serializers.SerializerMethodField()
