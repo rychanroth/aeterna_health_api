@@ -64,6 +64,19 @@ class Supplier(models.Model):
     def __str__(self):
         return self.name
 
+# ProductType
+class ProductType(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    description = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'product_types'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
 
 class Medicine(models.Model):
     name = models.CharField(max_length=200)
@@ -388,3 +401,4 @@ class StockMovement(models.Model):
             self.MovementType.RETURN_SUPPLIER,
             self.MovementType.ADJUSTMENT_OUT
         ]
+    
