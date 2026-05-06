@@ -99,6 +99,17 @@ class SupplierViewSet(viewsets.ModelViewSet):
         serializer = MedicineSerializer(medicines, many=True)
         return Response(serializer.data)
 
+class ProductTypeViewSet(viewsets.ModelViewSet):
+    queryset = ProductType.objects.all()
+    serializer_class = ProductTypeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdminUser]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
 class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
