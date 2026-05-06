@@ -139,6 +139,16 @@ class MedicineViewSet(viewsets.ModelViewSet):
         if category_id:
             queryset = queryset.filter(category_id=category_id)
 
+        """Fitler medicines by product_type"""
+        product_type_id = self.request.query_params.get('product_type')
+        if product_type_id:
+            queryset = queryset.filter(product_type_id=product_type_id)
+
+        """Filter medicines by base unit"""
+        base_unit = self.request.query_params.get('base_unit')
+        if base_unit:
+            queryset = queryset.filter(base_unit=base_unit)
+
         """Filter medicines by expiration"""
         expired = self.request.query_params.get('expired')
         if expired == 'true':
@@ -150,6 +160,11 @@ class MedicineViewSet(viewsets.ModelViewSet):
         low_stock = self.request.query_params.get('low_stock')
         if low_stock == 'true':
             queryset = queryset.filter(stock_quantity__lt=10) 
+
+        """Filter medicines by prescription required"""
+        requires_prescription = self.request.query_params.get('requires_prescription')
+        if requires_prescription == 'true':
+            queryset = queryset.filter(requires_prescription=True)
 
         return queryset
     
@@ -190,6 +205,17 @@ class MedicineViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(expiring, many=True)
         return Response(serializer.data)
     
+    @action(detail=False, methods=['get'])
+    def by_type(self, request):
+        """Get medicines grouped by product type"""
+        product_type_id = request.query_params.get('product_type_id')
+        if not product_type_id:
+            return Response({"error": "product_type_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        medicines = self.get_queryset().filter(product_type_id=product_type_id)
+        serializer = self.get_serializer(medicines, many=True)
+        return Response(serializer.data)
+
 class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
     serializer_class = SaleSerializer
