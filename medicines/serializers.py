@@ -161,6 +161,71 @@ class SaleSerializer(serializers.ModelSerializer):
             return obj.cashier.get_full_name() or obj.cashier.username
         return None
     
+    # CUSTOM VALIDATION
+    def validate(self, data):
+        """Validate prescription amounts"""
+        items_data = data.get('items', [])
+        prescription = data.get('prescription')
+
+        requires_prescription = False
+        for item_data in items_data:
+            medicine = item_data.get('medicine')
+            if medicine and medicine.requires_prescription:
+                requires_prescription = True
+                break
+
+        if requires_prescription and not prescription:
+            raise serializers.ValidationError(
+                "One or more medicine requires prescription. Please provide prescription."
+            )
+        
+        if prescription:
+            if prescription.status != Prescription.Status.VERIFIED:
+                raise serializers.ValidationError(
+                    f"Prescription must be verified before sale. Current status: {prescription.status}"
+                )
+            
+            # Validate items match prescription
+            prescription_medicines = set(
+                item.medicine_id for item in prescription.items.all()
+            )
+            sale_medicines = set(
+                item_data.get('medicine').id for item_data in items_data 
+                if item_data.get('medicine')
+            )
+            
+            # Check if sale items are in prescription
+            if not sale_medicines.issubset(prescription_medicines):
+                raise serializers.ValidationError(
+                    "Some medicines are not in the prescription."
+                )
+        
+        return data
+    
+    # Custom Create Logic
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        
+        # Generate sale number
+        import datetime
+        today = datetime.date.today()
+        count = Sale.objects.filter(created_at__date=today).count() + 1
+        validated_data['sale_number'] = f"INV-{today.strftime('%Y%m%d')}-{count:04d}"
+        
+        # Create sale
+        sale = Sale.objects.create(**validated_data)
+        
+        # Create items and deduct stock
+        for item_data in items_data:
+            SaleItem.objects.create(sale=sale, **item_data)
+        
+        # Update prescription status if provided
+        if sale.prescription:
+            sale.prescription.status = Prescription.Status.DISPENSED
+            sale.prescription.save(update_fields=['status'])
+        
+        return sale
+    
     def create(self, validated_data):
         items_data = validated_data.pop('items')
 
