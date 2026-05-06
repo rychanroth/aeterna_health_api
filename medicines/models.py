@@ -172,15 +172,6 @@ class Sale(models.Model):
     def __str__(self):
         return self.sale_number
     
-    def save(self, *args, **kwargs):
-        if not self.sale_number:
-            # Generate sales number
-            import datetime
-            today = datetime.date.today()
-            count = Sale.objects.filter(created_at__date=today).count()+1
-            self.sale_number = f"INV-{today.strftime('%Y%m%d')}-{count:04d}"
-        return super().save(*args, **kwargs)
-    
     def calculate_total(self):
         """Sum total of all items subtotal"""
         return sum(item.subtotal for item in self.items.all())

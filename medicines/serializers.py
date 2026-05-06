@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import *
+from django.db import transaction
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -203,6 +204,7 @@ class SaleSerializer(serializers.ModelSerializer):
         return data
     
     # Custom Create Logic
+    @transaction.atomic()
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         
@@ -226,6 +228,7 @@ class SaleSerializer(serializers.ModelSerializer):
         
         return sale
     
+    @transaction.atomic()
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
 
