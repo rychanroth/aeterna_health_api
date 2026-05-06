@@ -277,7 +277,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockMovement
         fields = [
-            'id', 'medicine', 'medicine_name', 'medicine_id',
+            'id', 'medicine_name', 'medicine_id',
             'movement_type', 'quantity', 'unit_cost',
             'reference', 'notes',
             'created_by', 'created_by_name',
