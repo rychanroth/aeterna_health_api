@@ -321,3 +321,70 @@ class PrescriptionItem(models.Model):
     def __str__(self):
         medicine_name = self.medicine.name if self.medicine else "Unknown Medicine"
         return f"{self.prescription.prescription_number} - {medicine_name}"
+    
+# === STOCK MOVEMENT ===
+class StockMovement(models.Model):
+    class MovementType(models.TextChoices):
+        # IN 
+        PURCHASE = 'purchase', 'Purchase'
+        RETURN_CUSTOMER = 'return_customer', 'Return from Customer'
+        ADJUSTMENT_IN = 'adjustment_in', 'Adjustment (In)'
+        # OUT
+        SALE = 'sale', 'Sale'
+        EXPIRED = 'expired', 'Expired'
+        DAMAGED = 'damaged', 'Damaged'
+        RETURN_SUPPLIER = 'return_supplier', 'Return to Supplier'
+        ADJUSTMENT_OUT = 'adjustment_out', 'Adjustment (Out)'
+    
+    medicine = models.ForeignKey(
+        'Medicine',
+        on_delete=models.CASCADE,
+        related_name='stock_movements'
+    )
+    movement_type = models.CharField(
+        max_length=20,
+        choices=MovementType.choices
+    )
+    quantity = models.IntegerField()  # positive for int, negative for out
+    unit_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    reference = models.CharField(max_length=100, blank=True)  # invoice, sale, etc...
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='stock_movements'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'stock_movements'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.movement_type} - {self.medicine} x {self.quantity}"
+
+    @property
+    def is_stock_in(self):
+        """Check if this movement increases stock"""
+        return self.movement_type in [
+            self.MovementType.PURCHASE,
+            self.MovementType.RETURN_CUSTOMER,
+            self.MovementType.ADJUSTMENT_IN
+        ]
+
+    @property
+    def is_stock_out(self):
+        """Check if this movement decreases stock"""
+        return self.movement_type in [
+            self.MovementType.SALE,
+            self.MovementType.EXPIRED,
+            self.MovementType.DAMAGED,
+            self.MovementType.RETURN_SUPPLIER,
+            self.MovementType.ADJUSTMENT_OUT
+        ]
