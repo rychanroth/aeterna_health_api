@@ -33,6 +33,17 @@ class SupplierSerializer(serializers.ModelSerializer):
 
     def get_medicines_count(self, obj):
         return obj.medicines.count()
+    
+class ProductTypeSerializer(serializers.ModelSerializer):
+    medicines_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductType
+        fields = ['id', 'name', 'description', 'is_active', 'medicines_count', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def get_medicines_count(self, obj):
+        return obj.medicines.count()
 
 class MedicineSerializer(serializers.ModelSerializer):
     # Nested read-only (GET) for display
