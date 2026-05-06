@@ -205,26 +205,49 @@ class SaleItem(models.Model):
         db_table = 'sale_items'
     
     def save(self, *args, **kwargs):
-        # Auto-fill price from Medicine if not provided
-        if not self.unit_price and self.medicine:
-            self.unit_price =  self.medicine.selling_price
-
-        # Double type handling
-        if self.quantity and self.unit_price:
-            self.subtotal = Decimal(str(self.quantity)) * Decimal(str(self.unit_price))
-
-        # Stock management logic
-        if not self.pk:
-            if self.medicine and self.medicine.stock_quantity >= self.quantity:
-                self.medicine.stock_quantity -= self.quantity
-                self.medicine.save()
-            else:
-                raise ValueError("Not enough stock available!")
+        # Calculate subtotal
+        self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
+        
+        is_new = self.pk is None
+        old_quantity = 0
+        
+        # Get old quantity if updating
+        if not is_new:
+            try:
+                old_item = SaleItem.objects.get(pk=self.pk)
+                old_quantity = old_item.quantity
+            except SaleItem.DoesNotExist:
+                pass
+        
         super().save(*args, **kwargs)
+        
+        # Update medicine stock (deduct for new, adjust for update)
+        if self.medicine:
+            if is_new:
+                # New item: deduct stock
+                self.medicine.stock_quantity -= self.quantity
+            else:
+                # Update: adjust by difference
+                quantity_diff = old_quantity - self.quantity
+                self.medicine.stock_quantity += quantity_diff
             
-        # Update total_amount field in Sale
+            self.medicine.save(update_fields=['stock_quantity'])
+        
+        # Update sale total
         self.sale.total_amount = self.sale.calculate_total()
-        self.sale.save(update_fields=['total_amount'])    
+        self.sale.save(update_fields=['total_amount'])
+
+    def delete(self, *args, **kwargs):
+        # Restore stock on delete
+        if self.medicine:
+            self.medicine.stock_quantity += self.quantity
+            self.medicine.save(update_fields=['stock_quantity'])
+        
+        super().delete(*args, **kwargs)
+        
+        # Update sale total
+        self.sale.total_amount = self.sale.calculate_total()
+        self.sale.save(update_fields=['total_amount'])  
 
     def __str__(self):
         return f"{self.sale.sale_number} - {self.medicine}"

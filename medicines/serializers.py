@@ -226,18 +226,6 @@ class SaleSerializer(serializers.ModelSerializer):
         
         return sale
     
-    def create(self, validated_data):
-        items_data = validated_data.pop('items')
-
-        # Create sale
-        sale = Sale.objects.create(**validated_data)
-
-        # Create items
-        for item_data in items_data:
-            SaleItem.objects.create(sale=sale, **item_data)
-
-        return sale
-    
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
 
