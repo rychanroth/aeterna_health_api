@@ -86,7 +86,7 @@ class ReportViewSet(viewsets.ViewSet):
         low_threshold = int(request.query_params.get('low_threshold', 50))
         days_ahead = int(request.query_params.get('days_ahead', 90))
         
-        expiry_date = timezone.now().date() + timedelta(days=days_ahead)
+        expiration_date = timezone.now().date() + timedelta(days=days_ahead)
         
         # Low stock
         low_stock = Medicine.objects.filter(
@@ -95,14 +95,14 @@ class ReportViewSet(viewsets.ViewSet):
         
         # Expiring soon
         expiring_soon = Medicine.objects.filter(
-            expiry_date__lte=expiry_date,
-            expiry_date__gt=timezone.now().date()
-        ).values('id', 'name', 'expiry_date', 'stock_quantity')
+            expiration_date__lte=expiration_date,
+            expiration_date__gt=timezone.now().date()
+        ).values('id', 'name', 'expiration_date', 'stock_quantity')
         
         # Already expired
         expired = Medicine.objects.filter(
-            expiry_date__lt=timezone.now().date()
-        ).values('id', 'name', 'expiry_date', 'stock_quantity')
+            expiration_date__lt=timezone.now().date()
+        ).values('id', 'name', 'expiration_date', 'stock_quantity')
         
         return Response({
             'low_stock': list(low_stock),
@@ -131,7 +131,7 @@ class ReportViewSet(viewsets.ViewSet):
             status='pending'
         ).order_by('-created_at')[:10].values(
             'id', 'prescription_number', 'created_at',
-            'doctor__name', 'patient__full_name'
+            'doctor__name', 'patient__name'
         )
         
         return Response({
