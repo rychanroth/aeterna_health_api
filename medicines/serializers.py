@@ -26,27 +26,27 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'parent', 'parent_id']
 
 class SupplierSerializer(serializers.ModelSerializer):
-    medicines_count = serializers.SerializerMethodField()
+    products_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Supplier
-        fields = ['id', 'name', 'phone', 'address', 'is_active', 'medicines_count', 'created_at']
+        fields = ['id', 'name', 'phone', 'address', 'is_active', 'products_count', 'created_at']
 
-    def get_medicines_count(self, obj):
-        return obj.medicines.count()
+    def get_products_count(self, obj):
+        return obj.products.count()
     
 class ProductTypeSerializer(serializers.ModelSerializer):
-    medicines_count = serializers.SerializerMethodField()
+    products_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductType
-        fields = ['id', 'name', 'description', 'is_active', 'medicines_count', 'created_at']
+        fields = ['id', 'name', 'description', 'is_active', 'products_count', 'created_at']
         read_only_fields = ['id', 'created_at']
 
-    def get_medicines_count(self, obj):
-        return obj.medicines.count()
+    def get_products_count(self, obj):
+        return obj.products.count()
 
-class MedicineSerializer(serializers.ModelSerializer):
+class ProductSerializer(serializers.ModelSerializer):
     # Nested read-only (GET) for display
     category = CategorySerializer(read_only=True)
     suppliers = SupplierSerializer(many=True, read_only=True)
@@ -76,7 +76,7 @@ class MedicineSerializer(serializers.ModelSerializer):
     is_low_stock = serializers.ReadOnlyField()
 
     class Meta:
-        model = Medicine
+        model = Product
         fields = [
             'id', 'name', 
             'product_type', 'product_type_id', 'base_unit',
@@ -100,17 +100,17 @@ class MedicineSerializer(serializers.ModelSerializer):
         return value
 
 class SaleItemSerializer(serializers.ModelSerializer):
-    medicine_name = serializers.ReadOnlyField(source='medicine.name')
-    medicine_id = serializers.PrimaryKeyRelatedField(
-        queryset=Medicine.objects.all(),
-        source='medicine',
+    product_name = serializers.ReadOnlyField(source='product.name')
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        source='product',
         write_only=True
     )
 
     class Meta:
         model = SaleItem
         fields = [
-            'id', 'medicine_name', 'medicine_id',
+            'id', 'product_name', 'product_id',
             'quantity', 'unit_price', 'subtotal',
         ]
         read_only_fields = ['id', 'subtotal']
@@ -121,17 +121,17 @@ class SaleItemSerializer(serializers.ModelSerializer):
         return value
     
     def validate(self, data):
-        medicine = data.get('medicine')
+        product = data.get('product')
         quantity = data.get('quantity')
 
-        if medicine and quantity:
-            if medicine.stock_quantity < quantity:
+        if product and quantity:
+            if product.stock_quantity < quantity:
                 raise serializers.ValidationError(
-                    f"Insufficient stock available: {medicine.stoc_quantity} {medicine.base_unit}(s)"
+                    f"Insufficient stock available: {product.stoc_quantity} {product.base_unit}(s)"
                 )
-            if medicine.is_expired:
+            if product.is_expired:
                 raise serializers.ValidationError(
-                    f"Cannot sell expired medicines. Expired on {medicine.expiration_date}"
+                    f"Cannot sell expired products. Expired on {product.expiration_date}"
                 )
         return data
         
@@ -170,14 +170,14 @@ class SaleSerializer(serializers.ModelSerializer):
 
         requires_prescription = False
         for item_data in items_data:
-            medicine = item_data.get('medicine')
-            if medicine and medicine.requires_prescription:
+            product = item_data.get('product')
+            if product and product.requires_prescription:
                 requires_prescription = True
                 break
 
         if requires_prescription and not prescription:
             raise serializers.ValidationError(
-                "One or more medicine requires prescription. Please provide prescription."
+                "One or more product requires prescription. Please provide prescription."
             )
         
         if prescription:
@@ -187,18 +187,18 @@ class SaleSerializer(serializers.ModelSerializer):
                 )
             
             # Validate items match prescription
-            prescription_medicines = set(
-                item.medicine_id for item in prescription.items.all()
+            prescription_products = set(
+                item.product_id for item in prescription.items.all()
             )
-            sale_medicines = set(
-                item_data.get('medicine').id for item_data in items_data 
-                if item_data.get('medicine')
+            sale_products = set(
+                item_data.get('product').id for item_data in items_data 
+                if item_data.get('product')
             )
             
             # Check if sale items are in prescription
-            if not sale_medicines.issubset(prescription_medicines):
+            if not sale_products.issubset(prescription_products):
                 raise serializers.ValidationError(
-                    "Some medicines are not in the prescription."
+                    "Some products are not in the prescription."
                 )
         
         return data
@@ -280,17 +280,17 @@ class PatientSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
-    medicine_name = serializers.ReadOnlyField(source='medicine.name')
-    medicine_id = serializers.PrimaryKeyRelatedField(
-        queryset=Medicine.objects.all(),
-        source='medicine',
+    product_name = serializers.ReadOnlyField(source='product.name')
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        source='product',
         write_only=True
     )
 
     class Meta:
         model = PrescriptionItem
         fields = [
-            'id', 'medicine', 'medicine_name', 'medicine_id',
+            'id', 'product', 'product_name', 'product_id',
             'quantity_prescribed', 'dosage_instructions', 'is_dispensed'
         ]
         read_only_fields = ['id', 'is_dispensed']
@@ -362,10 +362,10 @@ class PrescriptionSerializer(serializers.ModelSerializer):
     
 
 class StockMovementSerializer(serializers.ModelSerializer):
-    medicine_name = serializers.ReadOnlyField(source='medicine.name')
-    medicine_id = serializers.PrimaryKeyRelatedField(
-        queryset=Medicine.objects.all(),
-        source='medicine',
+    product_name = serializers.ReadOnlyField(source='product.name')
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        source='product',
         write_only=True
     )
     created_by_name = serializers.SerializerMethodField()
@@ -375,7 +375,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockMovement
         fields = [
-            'id', 'medicine_name', 'medicine_id',
+            'id', 'product_name', 'product_id',
             'movement_type', 'quantity', 'unit_cost',
             'reference', 'notes',
             'created_by', 'created_by_name',
@@ -397,7 +397,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Validate stock out movements have enough stock"""
-        medicine = data.get('medicine')
+        product = data.get('product')
         movement_type = data.get('movement_type')
         quantity = data.get('quantity')
         
@@ -412,9 +412,9 @@ class StockMovementSerializer(serializers.ModelSerializer):
             ]
             
             if movement_type in movement_types_out:
-                if medicine.stock_quantity < quantity:
+                if product.stock_quantity < quantity:
                     raise serializers.ValidationError(
-                        f"Insufficient stock. Available: {medicine.stock_quantity}"
+                        f"Insufficient stock. Available: {product.stock_quantity}"
                     )
         
         return data
@@ -426,12 +426,12 @@ class StockMovementSerializer(serializers.ModelSerializer):
         # Create the movement
         movement = super().create(validated_data)
         
-        # Update medicine stock
-        medicine = movement.medicine
+        # Update product stock
+        product = movement.product
         if movement.is_stock_in:
-            medicine.stock_quantity += movement.quantity
+            product.stock_quantity += movement.quantity
         else:
-            medicine.stock_quantity -= movement.quantity
-        medicine.save(update_fields=['stock_quantity'])
+            product.stock_quantity -= movement.quantity
+        product.save(update_fields=['stock_quantity'])
         
         return movement

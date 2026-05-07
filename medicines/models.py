@@ -48,7 +48,7 @@ class Category(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return self.name
+        return self.name6
     
 class Supplier(models.Model):
     name = models.CharField(max_length=150)
@@ -77,8 +77,8 @@ class ProductType(models.Model):
 
     def __str__(self):
         return self.name
-
-class Medicine(models.Model):
+    
+class Product(models.Model):
     class BaseUnit(models.TextChoices):
         TABLET = 'tablet', 'Tablet'
         CAPSULE = 'capsule', 'Capsule'
@@ -95,7 +95,7 @@ class Medicine(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='medicines'
+        related_name='products'
     )
     base_unit = models.CharField(
         max_length=20,
@@ -107,12 +107,12 @@ class Medicine(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='medicines'
+        related_name='products'
     )
     suppliers = models.ManyToManyField(
         'Supplier',
         blank=True,
-        related_name='medicines'
+        related_name='products'
     )
     description = models.TextField(blank=True)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -123,7 +123,7 @@ class Medicine(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'medicines'
+        db_table = 'products'
         ordering = ['-created_at']
 
     def __str__(self):
@@ -182,8 +182,8 @@ class SaleItem(models.Model):
         on_delete=models.CASCADE,
         related_name='items'
     )
-    medicine = models.ForeignKey(
-        'Medicine',
+    product = models.ForeignKey(
+        'Product',
         on_delete=models.SET_NULL,
         null=True,
         related_name='sale_items'
@@ -212,17 +212,17 @@ class SaleItem(models.Model):
         
         super().save(*args, **kwargs)
         
-        # Update medicine stock (deduct for new, adjust for update)
-        if self.medicine:
+        # Update product stock (deduct for new, adjust for update)
+        if self.product:
             if is_new:
                 # New item: deduct stock
-                self.medicine.stock_quantity -= self.quantity
+                self.product.stock_quantity -= self.quantity
             else:
                 # Update: adjust by difference
                 quantity_diff = old_quantity - self.quantity
-                self.medicine.stock_quantity += quantity_diff
+                self.product.stock_quantity += quantity_diff
             
-            self.medicine.save(update_fields=['stock_quantity'])
+            self.product.save(update_fields=['stock_quantity'])
         
         # Update sale total
         self.sale.total_amount = self.sale.calculate_total()
@@ -230,9 +230,9 @@ class SaleItem(models.Model):
 
     def delete(self, *args, **kwargs):
         # Restore stock on delete
-        if self.medicine:
-            self.medicine.stock_quantity += self.quantity
-            self.medicine.save(update_fields=['stock_quantity'])
+        if self.product:
+            self.product.stock_quantity += self.quantity
+            self.product.save(update_fields=['stock_quantity'])
         
         super().delete(*args, **kwargs)
         
@@ -241,7 +241,7 @@ class SaleItem(models.Model):
         self.sale.save(update_fields=['total_amount'])  
 
     def __str__(self):
-        return f"{self.sale.sale_number} - {self.medicine}"
+        return f"{self.sale.sale_number} - {self.product}"
 
 # === Doctor and Patient ===
 class Doctor(models.Model):
@@ -354,8 +354,8 @@ class PrescriptionItem(models.Model):
         on_delete=models.CASCADE,
         related_name='items'
     )
-    medicine = models.ForeignKey(
-        'Medicine',
+    product = models.ForeignKey(
+        'Product',
         on_delete=models.SET_NULL,
         null=True,
         related_name='prescription_items'
@@ -368,8 +368,8 @@ class PrescriptionItem(models.Model):
         db_table = 'prescription_items'
 
     def __str__(self):
-        medicine_name = self.medicine.name if self.medicine else "Unknown Medicine"
-        return f"{self.prescription.prescription_number} - {medicine_name}"
+        product_name = self.product.name if self.product else "Unknown Product"
+        return f"{self.prescription.prescription_number} - {product_name}"
     
 # === STOCK MOVEMENT ===
 class StockMovement(models.Model):
@@ -385,8 +385,8 @@ class StockMovement(models.Model):
         RETURN_SUPPLIER = 'return_supplier', 'Return to Supplier'
         ADJUSTMENT_OUT = 'adjustment_out', 'Adjustment (Out)'
     
-    medicine = models.ForeignKey(
-        'Medicine',
+    product = models.ForeignKey(
+        'Product',
         on_delete=models.CASCADE,
         related_name='stock_movements'
     )
@@ -416,7 +416,7 @@ class StockMovement(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.movement_type} - {self.medicine} x {self.quantity}"
+        return f"{self.movement_type} - {self.product} x {self.quantity}"
 
     @property
     def is_stock_in(self):
@@ -442,10 +442,10 @@ class StockMovement(models.Model):
         is_new = self.pk is None
         super().save(*args, **kwargs)
     
-        # Update medicine stock on the movement
-        if is_new and self.medicine:
+        # Update product stock on the movement
+        if is_new and self.product:
             if self.is_stock_in:
-                self.medicine.stock_quantity += self.quantity
+                self.product.stock_quantity += self.quantity
             else:
-                self.medicine.stock_quantity -= self.quantity
-            self.medicine.save(update_fields=['stock_quantity'])
+                self.product.stock_quantity -= self.quantity
+            self.product.save(update_fields=['stock_quantity'])

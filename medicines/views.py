@@ -54,7 +54,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     # === Custom Permissions ===
     def get_permissions(self):
         """Anyone can view, but only authenticated user can add/update/delete"""
-        if self.action in ['list', 'retrieve', 'roots', 'medicines']:
+        if self.action in ['list', 'retrieve', 'roots', 'products']:
             permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAdminUser]
@@ -70,11 +70,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
-    def medicines(self, request, pk=None):
-        """Get all medicines in this category"""
+    def products(self, request, pk=None):
+        """Get all products in this category"""
         category = self.get_object()
-        medicines = category.medicines.filter(is_active=True)
-        serializer = MedicineSerializer(medicines, many=True)
+        products = category.products.filter(is_active=True)
+        serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
 
 class SupplierViewSet(viewsets.ModelViewSet):
@@ -92,11 +92,11 @@ class SupplierViewSet(viewsets.ModelViewSet):
     
     # Custom Action
     @action(detail=True, methods=['get'])
-    def medicines(self, request, pk=None):
-        """Get all medicines from this supplier"""
+    def products(self, request, pk=None):
+        """Get all products from this supplier"""
         supplier = self.get_object()
-        medicines = supplier.medicines.filter(is_active=True)
-        serializer = MedicineSerializer(medicines, many=True)
+        products = supplier.products.filter(is_active=True)
+        serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
 
 class ProductTypeViewSet(viewsets.ModelViewSet):
@@ -111,9 +111,9 @@ class ProductTypeViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
 
-class MedicineViewSet(viewsets.ModelViewSet):
-    queryset = Medicine.objects.all()
-    serializer_class = MedicineSerializer
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
 
     # === Custom Permissions ===
@@ -127,41 +127,41 @@ class MedicineViewSet(viewsets.ModelViewSet):
 
     # Custom Queryset
     def get_queryset(self):
-        queryset = Medicine.objects.all()
+        queryset = Product.objects.all()
 
-        """Filter medicines by search query"""
+        """Filter products by search query"""
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(name__icontains=search)
 
-        """Filter medicines by category"""
+        """Filter products by category"""
         category_id = self.request.query_params.get('category')
         if category_id:
             queryset = queryset.filter(category_id=category_id)
 
-        """Fitler medicines by product_type"""
+        """Fitler products by product_type"""
         product_type_id = self.request.query_params.get('product_type')
         if product_type_id:
             queryset = queryset.filter(product_type_id=product_type_id)
 
-        """Filter medicines by base unit"""
+        """Filter products by base unit"""
         base_unit = self.request.query_params.get('base_unit')
         if base_unit:
             queryset = queryset.filter(base_unit=base_unit)
 
-        """Filter medicines by expiration"""
+        """Filter products by expiration"""
         expired = self.request.query_params.get('expired')
         if expired == 'true':
             queryset = queryset.filter(expiration_date__lt=timezone.now().date())
         elif expired == 'false':
             queryset = queryset.filter(expiration_date__gte=timezone.now().date())
 
-        """Filter medicines by low stock"""
+        """Filter products by low stock"""
         low_stock = self.request.query_params.get('low_stock')
         if low_stock == 'true':
             queryset = queryset.filter(stock_quantity__lt=10) 
 
-        """Filter medicines by prescription required"""
+        """Filter products by prescription required"""
         requires_prescription = self.request.query_params.get('requires_prescription')
         if requires_prescription == 'true':
             queryset = queryset.filter(requires_prescription=True)
@@ -170,12 +170,12 @@ class MedicineViewSet(viewsets.ModelViewSet):
     
     # Custom Logic
     def perform_create(self, serializer):
-        medicine = serializer.save()
+        product = serializer.save()
 
     # Custom Action
     @action(detail=False, methods=['get'])
     def expired(self, request):
-        """Get all expired medicines"""
+        """Get all expired products"""
         expired = self.queryset.filter(
             expiration_date__lt=timezone.now().date(),
             is_active=True
@@ -185,7 +185,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def low_stock(self, request):
-        """Get all medicines with low stock"""
+        """Get all products with low stock"""
         low_stock = self.queryset.filter(
             stock_quantity__lt=10,
             is_active=True
@@ -195,7 +195,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def expiring_soon(self, request):
-        """Get medicines expiring in the next 30 days"""
+        """Get products expiring in the next 30 days"""
         soon = timezone.now().date() + timedelta(days=30)
         expiring = self.queryset.filter(
             expiration_date__lte=soon,
@@ -207,13 +207,13 @@ class MedicineViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def by_type(self, request):
-        """Get medicines grouped by product type"""
+        """Get products grouped by product type"""
         product_type_id = request.query_params.get('product_type_id')
         if not product_type_id:
             return Response({"error": "product_type_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        medicines = self.get_queryset().filter(product_type_id=product_type_id)
-        serializer = self.get_serializer(medicines, many=True)
+        products = self.get_queryset().filter(product_type_id=product_type_id)
+        serializer = self.get_serializer(products, many=True)
         return Response(serializer.data)
 
 class SaleViewSet(viewsets.ModelViewSet):
@@ -447,10 +447,10 @@ class StockMovementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = StockMovement.objects.all()
         
-        # Filter by medicine
-        medicine_id = self.request.query_params.get('medicine')
-        if medicine_id:
-            queryset = queryset.filter(medicine_id=medicine_id)
+        # Filter by product
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
         
         # Filter by movement type
         movement_type = self.request.query_params.get('movement_type')
@@ -521,14 +521,14 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         """Get stock movement summary"""
         from django.db.models import Sum
         
-        medicine_id = request.query_params.get('medicine')
+        product_id = request.query_params.get('product')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         
         queryset = StockMovement.objects.all()
         
-        if medicine_id:
-            queryset = queryset.filter(medicine_id=medicine_id)
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
         if start_date:
             queryset = queryset.filter(created_at__date__gte=start_date)
         if end_date:

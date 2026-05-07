@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.db.models import Sum, Count, Avg, F, Q
 from django.utils import timezone
 from datetime import timedelta
-from .models import Sale, SaleItem, Medicine, Prescription
+from .models import *
 from django.db.models.functions import TruncDate, TruncMonth
 
 
@@ -56,16 +56,16 @@ class ReportViewSet(viewsets.ViewSet):
         })
     
     @action(detail=False, methods=['get'])
-    def top_medicines(self, request):
+    def top_products(self, request):
         """
-        Top selling medicines by quantity.
-        Usage: /api/reports/top_medicines/?limit=10
+        Top selling products by quantity.
+        Usage: /api/reports/top_products/?limit=10
         """
         limit = int(request.query_params.get('limit', 10))
         
         top_items = (
             SaleItem.objects
-            .values('medicine__id', 'medicine__name')
+            .values('product__id', 'product__name')
             .annotate(
                 total_quantity=Sum('quantity'),
                 total_revenue=Sum(F('quantity') * F('unit_price'))
@@ -74,13 +74,13 @@ class ReportViewSet(viewsets.ViewSet):
         )
         
         return Response({
-            'top_medicines': list(top_items)
+            'top_products': list(top_items)
         })
     
     @action(detail=False, methods=['get'])
     def stock_alerts(self, request):
         """
-        Low stock and expiring medicines alerts.
+        Low stock and expiring products alerts.
         Usage: /api/reports/stock_alerts/?low_threshold=50&days_ahead=90
         """
         low_threshold = int(request.query_params.get('low_threshold', 50))
@@ -89,18 +89,18 @@ class ReportViewSet(viewsets.ViewSet):
         expiration_date = timezone.now().date() + timedelta(days=days_ahead)
         
         # Low stock
-        low_stock = Medicine.objects.filter(
+        low_stock = Product.objects.filter(
             stock_quantity__lte=low_threshold
         ).values('id', 'name', 'stock_quantity', 'base_unit')
         
         # Expiring soon
-        expiring_soon = Medicine.objects.filter(
+        expiring_soon = Product.objects.filter(
             expiration_date__lte=expiration_date,
             expiration_date__gt=timezone.now().date()
         ).values('id', 'name', 'expiration_date', 'stock_quantity')
         
         # Already expired
-        expired = Medicine.objects.filter(
+        expired = Product.objects.filter(
             expiration_date__lt=timezone.now().date()
         ).values('id', 'name', 'expiration_date', 'stock_quantity')
         
