@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from decimal import Decimal
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 # Create your models here.
 
@@ -285,51 +286,96 @@ class SaleItem(models.Model):
 
     class Meta:
         db_table = 'sale_items'
+
+    def clean(self):
+        """Validate stock availability before save"""
+        super().clean()
+        
+        if self.product and self.quantity:
+            if self.product.stock_quantity < self.quantity:
+                raise ValidationError({
+                    'quantity': f'Insufficient stock. Available: {self.product.stock_quantity} {self.product.base_unit}(s)'
+                })
     
     def save(self, *args, **kwargs):
+        """Save with transaction and auto-create StockMovement"""
         # Calculate subtotal
         self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
         
         is_new = self.pk is None
         old_quantity = 0
+        old_product = None
         
         # Get old quantity if updating
         if not is_new:
             try:
                 old_item = SaleItem.objects.get(pk=self.pk)
                 old_quantity = old_item.quantity
+                old_product = old_item.product
             except SaleItem.DoesNotExist:
                 pass
         
-        super().save(*args, **kwargs)
-        
-        # Update product stock (deduct for new, adjust for update)
-        if self.product:
-            if is_new:
-                # New item: deduct stock
-                self.product.stock_quantity -= self.quantity
-            else:
-                # Update: adjust by difference
-                quantity_diff = old_quantity - self.quantity
-                self.product.stock_quantity += quantity_diff
+        with transaction.atomic():
+            from django.db import transaction
+            super().save(*args, **kwargs)
             
-            self.product.save(update_fields=['stock_quantity'])
-        
-        # Update sale total
-        self.sale.total_amount = self.sale.calculate_total()
-        self.sale.save(update_fields=['total_amount'])
+            # Update product stock (deduct for new, adjust for update)
+            if self.product:
+                if is_new:
+                    if self.product.stock_quantity < self.quantity:
+                        raise ValidationError({
+                            f'Insufficient stock for {self.product.name}'
+                        })
+                    
+                    # New item: deduct stock
+                    self.product.stock_quantity -= self.quantity
+                    self.product.save(update_fields=['stock_quantity'])
+
+                    # Create StockMovement audit record
+                    StockMovement.objects.create(
+                        product=self.product,
+                        movement_type=StockMovement.Reason.SALE,
+                        quantity=self.quantity,
+                        sale=self.sale,
+                        notes=f'Auto-created from Sale #{self.sale.sale_number}',
+                        created_by=self.sale.cashier
+                    )
+                else:
+                    # Update: adjust by difference
+                    if old_product and old_product != self.product:
+                        # Product changed: restore old, deduct new
+                        old_product.stock_quantity += old_quantity
+                        old_product.save(update_fields=['stock_quantity'])
+                        
+                        self.product.stock_quantity -= self.quantity
+                        self.product.save(update_fields=['stock_quantity'])
+                    elif old_quantity != self.quantity:
+                        # Same product, quantity changed: adjust difference
+                        quantity_diff = old_quantity - self.quantity
+                        self.product.stock_quantity += quantity_diff
+                        self.product.save(update_fields=['stock_quantity'])
+            
+            # Update sale total
+            self.sale.total_amount = self.sale.calculate_total()
+            self.sale.save(update_fields=['total_amount'])
 
     def delete(self, *args, **kwargs):
-        # Restore stock on delete
-        if self.product:
-            self.product.stock_quantity += self.quantity
-            self.product.save(update_fields=['stock_quantity'])
+        """Delete with transaction and restore stock"""
+        from django.db import transaction
         
-        super().delete(*args, **kwargs)
-        
-        # Update sale total
-        self.sale.total_amount = self.sale.calculate_total()
-        self.sale.save(update_fields=['total_amount'])  
+        with transaction.atomic():
+            if self.product:
+                self.product.stock_quantity += self.quantity
+                self.product.save(update_fields=['stock_quantity'])
+
+            # Store sale reference before deletion
+            sale = self.sale
+            
+            super().delete(*args, **kwargs)
+            
+            # Update sale total
+            sale.total_amount = sale.calculate_total()
+            sale.save(update_fields=['total_amount'])  
 
     def __str__(self):
         return f"{self.sale.sale_number} - {self.product}"
