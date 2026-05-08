@@ -31,13 +31,19 @@ class User(AbstractUser):
         return self.role == self.Role.CASHIER
 
 class Category(models.Model):
-    name = models.CharField(max_length=200, unique=True)
+    name = models.CharField(max_length=200)
     parent = models.ForeignKey(
         'self', # foreign key to ITSELF
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name = 'children' # access subcategories(children) with category.children.all()
+    )
+    product_type = models.ForeignKey(
+        'ProductType',
+        on_delete=models.CASCADE,
+        related_name='categories',
+        verbose_name='product type'
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -46,9 +52,15 @@ class Category(models.Model):
         db_table = 'categories'
         verbose_name_plural = 'Categories' # Fix admin pluralization
         ordering = ['name']
+        constraints = [ # Constraint name
+            models.UniqueConstraint(
+                fields=['name', 'product_type'],
+                name='unique_category_per_product_type'
+            )
+        ] 
 
     def __str__(self):
-        return self.name6
+        return self.name
     
 class Supplier(models.Model):
     name = models.CharField(max_length=150)
