@@ -74,7 +74,9 @@ class ProductSerializer(serializers.ModelSerializer):
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(),
         source='category',
-        write_only=True
+        write_only=True,
+        allow_null=True,
+        required=False
     )
     supplier_ids = serializers.PrimaryKeyRelatedField(
         queryset=Supplier.objects.all(),
@@ -92,6 +94,7 @@ class ProductSerializer(serializers.ModelSerializer):
     )
     is_expired = serializers.ReadOnlyField()
     is_low_stock = serializers.ReadOnlyField()
+    effective_requires_prescription = serializers.ReadOnlyField()
 
     class Meta:
         model = Product
@@ -101,10 +104,11 @@ class ProductSerializer(serializers.ModelSerializer):
             'category', 'category_id',
             'suppliers', 'supplier_ids', 'description',
             'selling_price', 'stock_quantity',
-            'expiration_date', 'requires_prescription',
+            'expiration_date', 'requires_prescription', 'effective_requires_prescription',
             'is_active', 'is_expired', 'is_low_stock',
             'created_at'
         ]
+        read_only_fields = ['id', 'created_at']
 
     # Custom Field Validation
     def validate_selling_price(self, value):
@@ -112,10 +116,21 @@ class ProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Price must be greater than 0.")
         return value
     
-    def validate_stock_quantity(self, value):
-        if value < 0:
-            raise serializers.ValidationError("Stock cannot be negative.")
-        return value
+    def validate(self, data):
+        """Validate based on product_type rules"""
+        data =  super().validate(data)
+
+        product_type = data.get('product_type') or (self.instance.product_type if self.instance else None)
+        expiration_date = data.get('expiration_date')
+
+        # Check expiration requirement based on ProductType
+        if product_type and product_type.requires_expiration:
+            if not expiration_date:
+                raise serializers.ValidationError({
+                    'expiration_date': f'Expiration date is required for {product_type.name} products'
+                })
+            
+        return data
 
 class SaleItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
