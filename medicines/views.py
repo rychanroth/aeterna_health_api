@@ -519,23 +519,21 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         # Filter by IN/OUT
         direction = self.request.query_params.get('direction')
         if direction == 'in':
-            queryset = queryset.filter(
-                movement_type__in=[
-                    StockMovement.MovementType.PURCHASE,
-                    StockMovement.MovementType.RETURN_CUSTOMER,
-                    StockMovement.MovementType.ADJUSTMENT_IN
-                ]
-            )
+            in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+            queryset = queryset.filter(movement_type__in=in_reasons)
         elif direction == 'out':
-            queryset = queryset.filter(
-                movement_type__in=[
-                    StockMovement.MovementType.SALE,
-                    StockMovement.MovementType.EXPIRED,
-                    StockMovement.MovementType.DAMAGED,
-                    StockMovement.MovementType.RETURN_SUPPLIER,
-                    StockMovement.MovementType.ADJUSTMENT_OUT
-                ]
-            )
+            out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+            queryset = queryset.filter(movement_type__in=out_reasons)
+
+        # Filter by supplier
+        supplier_id = self.request.query_params.get('supplier')
+        if supplier_id:
+            queryset = queryset.filter(supplier_id=supplier_id)
+
+        # Filter by sale
+        sale_id = self.request.query_params.get('sale')
+        if sale_id:
+            queryset = queryset.filter(sale_id=sale_id)
         
         # Filter by date range
         start_date = self.request.query_params.get('start_date')
@@ -550,28 +548,16 @@ class StockMovementViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stock_in(self, request):
         """Get all stock IN movements"""
-        movements = self.queryset.filter(
-            movement_type__in=[
-                StockMovement.MovementType.PURCHASE,
-                StockMovement.MovementType.RETURN_CUSTOMER,
-                StockMovement.MovementType.ADJUSTMENT_IN
-            ]
-        )
+        in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+        movements = self.queryset.filter(movement_type__in=in_reasons)
         serializer = self.get_serializer(movements, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def stock_out(self, request):
         """Get all stock OUT movements"""
-        movements = self.queryset.filter(
-            movement_type__in=[
-                StockMovement.MovementType.SALE,
-                StockMovement.MovementType.EXPIRED,
-                StockMovement.MovementType.DAMAGED,
-                StockMovement.MovementType.RETURN_SUPPLIER,
-                StockMovement.MovementType.ADJUSTMENT_OUT
-            ]
-        )
+        out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+        movements = self.queryset.filter(movement_type__in=out_reasons)
         serializer = self.get_serializer(movements, many=True)
         return Response(serializer.data)
 
@@ -594,25 +580,15 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(created_at__date__lte=end_date)
         
         # Calculate totals
-        stock_in_types = [
-            StockMovement.MovementType.PURCHASE,
-            StockMovement.MovementType.RETURN_CUSTOMER,
-            StockMovement.MovementType.ADJUSTMENT_IN
-        ]
-        stock_out_types = [
-            StockMovement.MovementType.SALE,
-            StockMovement.MovementType.EXPIRED,
-            StockMovement.MovementType.DAMAGED,
-            StockMovement.MovementType.RETURN_SUPPLIER,
-            StockMovement.MovementType.ADJUSTMENT_OUT
-        ]
+        in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+        out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
         
         total_in = queryset.filter(
-            movement_type__in=stock_in_types
+            movement_type__in=in_reasons
         ).aggregate(total=Sum('quantity'))['total'] or 0
         
         total_out = queryset.filter(
-            movement_type__in=stock_out_types
+            movement_type__in=out_reasons
         ).aggregate(total=Sum('quantity'))['total'] or 0
         
         return Response({
