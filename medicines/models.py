@@ -94,7 +94,7 @@ class ProductType(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'product_types'
+        db_table = 'producttypes'
         ordering = ['name']
 
     def __str__(self):
@@ -676,17 +676,5 @@ class StockMovement(models.Model):
     
     def save(self, *args, **kwargs):
         from django.db import transaction
-        is_new = self.pk is None
-
         self.clean()
-
-        with transaction.atomic():
-            super().save(*args, **kwargs)
-    
-            # Update product stock on the movement
-            if is_new and self.product:
-                if self.is_stock_in:
-                    self.product.stock_quantity += self.quantity
-                else:
-                    self.product.stock_quantity -= self.quantity
-                self.product.save(update_fields=['stock_quantity'])
+        super().save(*args, **kwargs)
