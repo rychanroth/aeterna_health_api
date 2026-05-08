@@ -11,6 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     # Read-only
     parent = serializers.StringRelatedField(read_only=True)
+    product_type = serializers.StringRelatedField(read_only=True)
     
     # Write-only
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -20,10 +21,16 @@ class CategorySerializer(serializers.ModelSerializer):
         allow_null=True,
         required=False
     )
+    product_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProductType.objects.all(),
+        source='product_type',
+        write_only=True
+    )
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'parent', 'parent_id']
+        fields = ['id', 'name', 'product_type', 'product_type_id', 'parent', 'parent_id', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
 class SupplierSerializer(serializers.ModelSerializer):
     products_count = serializers.SerializerMethodField()
@@ -37,6 +44,7 @@ class SupplierSerializer(serializers.ModelSerializer):
     
 class ProductTypeSerializer(serializers.ModelSerializer):
     products_count = serializers.SerializerMethodField()
+    categories_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductType
@@ -48,6 +56,9 @@ class ProductTypeSerializer(serializers.ModelSerializer):
 
     def get_products_count(self, obj):
         return obj.products.count()
+    
+    def get_categories_count(self, obj):
+        return obj.categories.count()
 
 class ProductSerializer(serializers.ModelSerializer):
     # Nested read-only (GET) for display
@@ -117,7 +128,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
             'quantity', 'unit_price', 'subtotal',
         ]
         read_only_fields = ['id', 'subtotal']
-
+    
     def validate_quantity(self, value):
         if value <= 0:
             raise serializers.ValidationError("Quantity must be greater than 0")
