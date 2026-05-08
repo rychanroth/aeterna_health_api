@@ -485,14 +485,34 @@ class StockMovement(models.Model):
         max_length=20,
         choices=MovementType.choices
     )
-    quantity = models.IntegerField()  # positive for int, negative for out
+    suppliers = models.ForeignKey(
+        'Supplier',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stock_movements',
+        help_text="For IN movements from Suppliers"
+    )
+    sale = models.ForeignKey(
+        'Sale',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stock_movements',
+        help_text="For OUT movements from Sales"
+    )
+    quantity = models.IntegerField() 
     unit_cost = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True
     )
-    reference = models.CharField(max_length=100, blank=True)  # invoice, sale, etc...
+    reference = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Manual reference for adjustments or other movements..."
+    )
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey(
         'User',
@@ -529,14 +549,41 @@ class StockMovement(models.Model):
             self.MovementType.ADJUSTMENT_OUT
         ]
     
-    def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        super().save(*args, **kwargs)
+    def clean(self):
+        """Validate FK fields match movement type"""
+        super().clean()
+        
+        # IN movements should have supplier 
+        if self.is_stock_in and self.sale:
+            raise ValidationError({
+                'sale': 'Sale reference should not be set for stock IN movements.'
+            })
+        
+        # OUT movements should have sale or manual reference
+        if self.is_stock_out and self.supplier:
+            raise ValidationError({
+                'supplier': 'Supplier reference should not be set for stock OUT movements.'
+            })
+        
+        # Quantity must be positive
+        if self.quantity <= 0:
+            raise ValidationError({
+                'quantity': 'Quantity must be a positive number.'
+            })
     
-        # Update product stock on the movement
-        if is_new and self.product:
-            if self.is_stock_in:
-                self.product.stock_quantity += self.quantity
-            else:
-                self.product.stock_quantity -= self.quantity
-            self.product.save(update_fields=['stock_quantity'])
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        is_new = self.pk is None
+
+        self.clean()
+
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+    
+            # Update product stock on the movement
+            if is_new and self.product:
+                if self.is_stock_in:
+                    self.product.stock_quantity += self.quantity
+                else:
+                    self.product.stock_quantity -= self.quantity
+                self.product.save(update_fields=['stock_quantity'])
