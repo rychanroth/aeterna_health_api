@@ -154,18 +154,18 @@ class SaleItemSerializer(serializers.ModelSerializer):
         return value
     
     def validate(self, data):
+        """Validate product can be sold"""
+        data = super().validaet(data)
         product = data.get('product')
-        quantity = data.get('quantity')
 
-        if product and quantity:
-            if product.stock_quantity < quantity:
-                raise serializers.ValidationError(
-                    f"Insufficient stock available: {product.stoc_quantity} {product.base_unit}(s)"
-                )
+        if product:
             if product.is_expired:
                 raise serializers.ValidationError(
                     f"Cannot sell expired products. Expired on {product.expiration_date}"
                 )
+            
+            if product.effective_requires_prescription:
+                pass
         return data
         
 
