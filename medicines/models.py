@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from decimal import Decimal
+from django.core.exceptions import ValidationError
 
 # Create your models here.
 
@@ -100,14 +101,52 @@ class ProductType(models.Model):
     
 class Product(models.Model):
     class BaseUnit(models.TextChoices):
+        # Medicine - Oral
         TABLET = 'tablet', 'Tablet'
         CAPSULE = 'capsule', 'Capsule'
+        SYRUP = 'syrup', 'Syrup'
+        
+        # Medicine - Liquid/Measurement
         ML = 'ml', 'Milliliter (mL)'
         G = 'g', 'Gram (g)'
         MG = 'mg', 'Milligram (mg)'
-        PIECE = 'piece', 'Piece'
+        
+        # Medicine - Packaging
+        VIAL = 'vial', 'Vial'
+        AMPOULE = 'ampoule', 'Ampoule'
         TUBE = 'tube', 'Tube'
         BOTTLE = 'bottle', 'Bottle'
+        
+        # Medical Equipment
+        PIECE = 'piece', 'Piece'
+        PACK = 'pack', 'Pack'
+        ROLL = 'roll', 'Roll'
+        BOX = 'box', 'Box'
+        SET = 'set', 'Set'
+        
+        # Baby Care / Skin Care
+        DIAPER = 'diaper', 'Diaper'
+        WIPES = 'wipes', 'Wipes'
+        SACHET = 'sachet', 'Sachet'
+        
+        # General
+        UNIT = 'unit', 'Unit'
+
+    @classmethod
+    def get_medicine_units(cls):
+        """Units typically used for medicine"""
+        return [cls.TABLET, cls.CAPSULE, cls.SYRUP, cls.ML, cls.G, 
+                cls.MG, cls.VIAL, cls.AMPOULE, cls.TUBE, cls.BOTTLE]
+    
+    @classmethod
+    def get_equipment_units(cls):
+        """Units typically used for medical equipment"""
+        return [cls.PIECE, cls.PACK, cls.ROLL, cls.BOX, cls.SET]
+    
+    @classmethod
+    def get_consumable_units(cls):
+        """Units for baby care, skin care, etc."""
+        return [cls.DIAPER, cls.WIPES, cls.SACHET, cls.PIECE, cls.PACK]
 
     name = models.CharField(max_length=200)
     product_type = models.ForeignKey(
@@ -141,7 +180,7 @@ class Product(models.Model):
     requires_prescription = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
     class Meta:
         db_table = 'products'
         ordering = ['-created_at']
@@ -159,6 +198,38 @@ class Product(models.Model):
     @property
     def is_low_stock(self):
         return self.stock_quantity < 10
+    
+    @property
+    def effective_requires_prescription(self):
+        if not self.product_type:
+            return self.requires_prescription
+        return self.requires_prescription or self.product_type.requires_prescription
+
+    def clean(self):
+        """Validate product fields based on ProductType rules"""
+        super().clean()
+        
+        if self.product_type:
+            # Expiration validation
+            if self.product_type.requires_expiration and not self.expiration_date:
+                raise ValidationError({
+                    'expiration_date': f'Expiration date is required for {self.product_type.name} products.'
+                })
+            
+            # Prescription validation - product can override type default
+            # (handled at serializer level for better UX)
+        
+        # Stock quantity validation
+        if self.stock_quantity < 0:
+            raise ValidationError({
+                'stock_quantity': 'Stock quantity cannot be negative.'
+            })
+    
+    def save(self, *args, **kwargs):
+        """Run validation before save"""
+        self.clean()
+        super().save(*args, **kwargs)
+
 
 class Sale(models.Model):
     class PaymentMethod(models.TextChoices):
