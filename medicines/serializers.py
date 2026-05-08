@@ -12,6 +12,7 @@ class CategorySerializer(serializers.ModelSerializer):
     # Read-only
     parent = serializers.StringRelatedField(read_only=True)
     product_type = serializers.StringRelatedField(read_only=True)
+    products_count = serializers.SerializerMethodField()
     
     # Write-only
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -31,6 +32,9 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'name', 'product_type', 'product_type_id', 'parent', 'parent_id', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+    def get_products_count(self, obj):
+        return obj.products.count()
 
 class SupplierSerializer(serializers.ModelSerializer):
     products_count = serializers.SerializerMethodField()
