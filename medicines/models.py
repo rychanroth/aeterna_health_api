@@ -68,6 +68,14 @@ class Supplier(models.Model):
 class ProductType(models.Model):
     name = models.CharField(max_length=50, unique=True)
     description = models.CharField(max_length=200, blank=True)
+    requires_expiration = models.BooleanField(
+        default=True,
+        help_text="Products of this type have expiration dates (e.g., Medicine)"
+    )
+    requires_prescription = models.BooleanField(
+        default=False,
+        help_text="Product of this type requires a prescription to purchase"
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
