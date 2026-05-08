@@ -81,7 +81,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter categories by producttype"""
         queryset = Category.objects.all()
-        
+
         # Filter by product type
         product_type_id = self.request.query_params.get('product_type')
         if product_type_id:
@@ -201,10 +201,29 @@ class ProductViewSet(viewsets.ModelViewSet):
         if low_stock == 'true':
             queryset = queryset.filter(stock_quantity__lt=10) 
 
-        """Filter products by prescription required"""
+        # Filter by prescription requirement (at product level)
         requires_prescription = self.request.query_params.get('requires_prescription')
-        if requires_prescription == 'true':
-            queryset = queryset.filter(requires_prescription=True)
+        if requires_prescription is not None:
+            queryset = queryset.filter(requires_prescription=requires_prescription.lower() == 'true')
+
+        # Filter by product type's requires_expiration flag
+        type_requires_expiration = self.request.query_params.get('type_requires_expiration')
+        if type_requires_expiration is not None:
+            queryset = queryset.filter(
+                product_type__requires_expiration=type_requires_expiration.lower() == 'true'
+            )
+
+        # Filter by product type's requires_prescription flag
+        type_requires_prescription = self.request.query_params.get('type_requires_prescription')
+        if type_requires_prescription is not None:
+            queryset = queryset.filter(
+                product_type__requires_prescription=type_requires_prescription.lower() == 'true'
+            )
+
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
 
         return queryset
     
