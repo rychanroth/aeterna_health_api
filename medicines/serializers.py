@@ -40,7 +40,10 @@ class ProductTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductType
-        fields = ['id', 'name', 'description', 'is_active', 'products_count', 'created_at']
+        fields = ['id', 'name', 'description',
+            'requires_prescription', 'requires_expiration',
+            'is_active', 'products_count', 'created_at'
+        ]
         read_only_fields = ['id', 'created_at']
 
     def get_products_count(self, obj):
