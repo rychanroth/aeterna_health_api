@@ -447,25 +447,21 @@ class StockMovementSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        """Validate stock out movements have enough stock"""
-        product = data.get('product')
+        """Validate using model's helper methods"""
+        data = super().validate(data)
+
+        product = data.get('product') or (self.instance.product if self.instance else None)
         movement_type = data.get('movement_type')
-        quantity = data.get('quantity')
+        quantity = data.get('quantity', 0)
         
-        # Check stock for OUT movements
+        # Check stock for OUT reasons
         if movement_type and quantity:
-            movement_types_out = [
-                StockMovement.MovementType.SALE,
-                StockMovement.MovementType.EXPIRED,
-                StockMovement.MovementType.DAMAGED,
-                StockMovement.MovementType.RETURN_SUPPLIER,
-                StockMovement.MovementType.ADJUSTMENT_OUT
-            ]
+            out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
             
-            if movement_type in movement_types_out:
-                if product.stock_quantity < quantity:
+            if movement_type in out_reasons:
+                if product and product.stock_quantity < quantity:
                     raise serializers.ValidationError(
-                        f"Insufficient stock. Available: {product.stock_quantity}"
+                        f"Insufficient stock. Available: {product.stock_quantity} {product.base_unit} (s)"
                     )
         
         return data
@@ -473,16 +469,4 @@ class StockMovementSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Auto-set created_by
         validated_data['created_by'] = self.context['request'].user
-        
-        # Create the movement
-        movement = super().create(validated_data)
-        
-        # Update product stock
-        product = movement.product
-        if movement.is_stock_in:
-            product.stock_quantity += movement.quantity
-        else:
-            product.stock_quantity -= movement.quantity
-        product.save(update_fields=['stock_quantity'])
-        
-        return movement
+        return super().create(validated_data)
