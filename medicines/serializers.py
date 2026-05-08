@@ -396,24 +396,42 @@ class PrescriptionSerializer(serializers.ModelSerializer):
 
 class StockMovementSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
+    supplier_name = serializers.ReadOnlyField(source='supplier.name')
+    sale_number = serializers.ReadOnlyField(source='sale.sale_number')
+    created_by_name = serializers.SerializerMethodField()
+    is_stock_in = serializers.ReadOnlyField()
+    is_stock_out = serializers.ReadOnlyField()
+    movement_direction = serializers.ReadOnlyField()
+    
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(),
         source='product',
         write_only=True
     )
-    created_by_name = serializers.SerializerMethodField()
-    is_stock_in = serializers.ReadOnlyField()
-    is_stock_out = serializers.ReadOnlyField()
-    
+    supplier_id = serializers.PrimaryKeyRelatedField(
+        queryset=Supplier.objects.all(),
+        source='supplier',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
+    sale_id = serializers.PrimaryKeyRelatedField(
+        queryset=Sale.objects.all(),
+        source='sale',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
     class Meta:
         model = StockMovement
         fields = [
             'id', 'product_name', 'product_id',
             'movement_type', 'quantity', 'unit_cost',
+            'supplier_name', 'supplier_id',
+            'sale_number', 'sale_id',
             'reference', 'notes',
-            'created_by', 'created_by_name',
-            'is_stock_in', 'is_stock_out',
-            'created_at'
+            'is_stock_in', 'is_stock_out', 'movement_direction',
+            'created_by', 'created_by_name', 'created_at'
         ]
         read_only_fields = ['id', 'created_by', 'created_at']
 
