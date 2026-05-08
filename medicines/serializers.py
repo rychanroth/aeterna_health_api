@@ -54,7 +54,8 @@ class ProductTypeSerializer(serializers.ModelSerializer):
         model = ProductType
         fields = ['id', 'name', 'description',
             'requires_prescription', 'requires_expiration',
-            'is_active', 'products_count', 'created_at'
+            'products_count', 'categories_count',
+            'is_active', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
 
