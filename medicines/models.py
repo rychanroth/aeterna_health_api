@@ -132,21 +132,21 @@ class Product(models.Model):
         # General
         UNIT = 'unit', 'Unit'
 
-    @classmethod
-    def get_medicine_units(cls):
-        """Units typically used for medicine"""
-        return [cls.TABLET, cls.CAPSULE, cls.SYRUP, cls.ML, cls.G, 
-                cls.MG, cls.VIAL, cls.AMPOULE, cls.TUBE, cls.BOTTLE]
-    
-    @classmethod
-    def get_equipment_units(cls):
-        """Units typically used for medical equipment"""
-        return [cls.PIECE, cls.PACK, cls.ROLL, cls.BOX, cls.SET]
-    
-    @classmethod
-    def get_consumable_units(cls):
-        """Units for baby care, skin care, etc."""
-        return [cls.DIAPER, cls.WIPES, cls.SACHET, cls.PIECE, cls.PACK]
+        @classmethod
+        def get_medicine_units(cls):
+            """Units typically used for medicine"""
+            return [cls.TABLET, cls.CAPSULE, cls.SYRUP, cls.ML, cls.G, 
+                    cls.MG, cls.VIAL, cls.AMPOULE, cls.TUBE, cls.BOTTLE]
+        
+        @classmethod
+        def get_equipment_units(cls):
+            """Units typically used for medical equipment"""
+            return [cls.PIECE, cls.PACK, cls.ROLL, cls.BOX, cls.SET]
+        
+        @classmethod
+        def get_consumable_units(cls):
+            """Units for baby care, skin care, etc."""
+            return [cls.DIAPER, cls.WIPES, cls.SACHET, cls.PIECE, cls.PACK]
 
     name = models.CharField(max_length=200)
     product_type = models.ForeignKey(
@@ -464,7 +464,10 @@ class PrescriptionItem(models.Model):
     
 # === STOCK MOVEMENT ===
 class StockMovement(models.Model):
-    class MovementType(models.TextChoices):
+    class Type(models.TextChoices):
+        IN = 'in', 'Stock In'
+        OUT  = 'out', 'Stock Out'
+    class Reason(models.TextChoices):
         # IN 
         PURCHASE = 'purchase', 'Purchase'
         RETURN_CUSTOMER = 'return_customer', 'Return from Customer'
@@ -475,6 +478,16 @@ class StockMovement(models.Model):
         DAMAGED = 'damaged', 'Damaged'
         RETURN_SUPPLIER = 'return_supplier', 'Return to Supplier'
         ADJUSTMENT_OUT = 'adjustment_out', 'Adjustment (Out)'
+
+        @classmethod
+        def get_in_reasons(cls):
+            """Return reasons that result in stock IN"""
+            return [cls.PURCHASE, cls.RETURN_CUSTOMER, cls.ADJUSTMENT_IN]
+        
+        @classmethod
+        def get_out_reasons(cls):
+            """Return reasons that result in stock OUT"""
+            return [cls.SALE, cls.EXPIRED, cls.DAMAGED, cls.RETURN_SUPPLIER, cls.ADJUSTMENT_OUT]
     
     product = models.ForeignKey(
         'Product',
@@ -483,7 +496,8 @@ class StockMovement(models.Model):
     )
     movement_type = models.CharField(
         max_length=20,
-        choices=MovementType.choices
+        choices=Reason.choices,
+        verbose_name='reason'
     )
     suppliers = models.ForeignKey(
         'Supplier',
@@ -532,22 +546,65 @@ class StockMovement(models.Model):
     @property
     def is_stock_in(self):
         """Check if this movement increases stock"""
-        return self.movement_type in [
-            self.MovementType.PURCHASE,
-            self.MovementType.RETURN_CUSTOMER,
-            self.MovementType.ADJUSTMENT_IN
-        ]
+        return self.movement_type in [r.value for r in self.Reason.get_in_reasons()]
 
     @property
     def is_stock_out(self):
         """Check if this movement decreases stock"""
-        return self.movement_type in [
-            self.MovementType.SALE,
-            self.MovementType.EXPIRED,
-            self.MovementType.DAMAGED,
-            self.MovementType.RETURN_SUPPLIER,
-            self.MovementType.ADJUSTMENT_OUT
-        ]
+        return self.movement_type in [r.value for r in self.Reason.get_out_reasons()]
+    
+    @property
+    def movement_direction(self):
+        """Return 'in' or 'out' based on reason"""
+        return self.Type.IN.value if self.is_stock_in else self.Type.OUT.value
+    
+    # === Business Logic Stock Movements ===
+    @classmethod
+    def create_purchase(cls, product, quantity, supplier, user, unit_cost=None, notes=''):
+        """
+        Create a purchase stock-in movement.
+        Usage: StockMovement.create_purchase(product, 100, supplier, request.user)
+        """
+        from django.db import transaction
+        
+        with transaction.atomic():
+            movement = cls.objects.create(
+                product=product,
+                movement_type=cls.Reason.PURCHASE,
+                quantity=quantity,
+                supplier=supplier,
+                unit_cost=unit_cost,
+                notes=notes,
+                created_by=user
+            )
+            # Stock update handled in save()
+            return movement
+    
+    @classmethod
+    def create_adjustment(cls, product, quantity, user, notes=''):
+        """
+        Create an adjustment movement.
+        Positive quantity = IN, Negative = OUT.
+        """
+        from django.db import transaction
+        
+        if quantity >= 0:
+            reason = cls.Reason.ADJUSTMENT_IN
+        else:
+            reason = cls.Reason.ADJUSTMENT_OUT
+            quantity = abs(quantity)
+        
+        with transaction.atomic():
+            movement = cls.objects.create(
+                product=product,
+                movement_type=reason,
+                quantity=quantity,
+                notes=notes,
+                created_by=user
+            )
+            return movement
+        
+    # === CLEAN AND SAVE ===
     
     def clean(self):
         """Validate FK fields match movement type"""
