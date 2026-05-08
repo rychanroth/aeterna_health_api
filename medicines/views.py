@@ -76,7 +76,23 @@ class CategoryViewSet(viewsets.ModelViewSet):
         products = category.products.filter(is_active=True)
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
+    
+    # === Custom Querysets ===
+    def get_queryset(self):
+        """Filter categories by producttype"""
+        queryset = Category.objects.all()
+        
+        # Filter by product type
+        product_type_id = self.request.query_params.get('product_type')
+        if product_type_id:
+            queryset = queryset.filter(product_type_id=product_type_id)
 
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        return queryset
 class SupplierViewSet(viewsets.ModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
