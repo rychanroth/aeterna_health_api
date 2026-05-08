@@ -110,6 +110,30 @@ class ProductTypeViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+    
+    # Overidding Methods
+    def get_queryset(self):
+        """Filter products by type flag"""
+        queryset = ProductType.objects.all()
+
+        # Filter by expiration requirement
+        requires_expiration = self.request.query_params.get('requires_expiration')
+        if requires_expiration is not None:
+            queryset = queryset.filter(requires_expiration=requires_expiration.lower() == 'true')
+
+        # Filter by prescription requirement
+        requires_prescription = self.request.query_params.get('requires_prescription')
+        if requires_prescription is not None:
+            queryset = queryset.filter(
+                requires_prescription=requires_prescription.lower() == 'true'
+            )
+
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        return queryset
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
