@@ -156,7 +156,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """Validate product can be sold"""
-        data = super().validaet(data)
+        data = super().validate(data)
         product = data.get('product')
 
         if product:
@@ -205,13 +205,14 @@ class SaleSerializer(serializers.ModelSerializer):
         requires_prescription = False
         for item_data in items_data:
             product = item_data.get('product')
-            if product and product.requires_prescription:
+            # FIX: Check effective_requires_prescription to include ProductType rules
+            if product and product.effective_requires_prescription:
                 requires_prescription = True
                 break
 
         if requires_prescription and not prescription:
             raise serializers.ValidationError(
-                "One or more product requires prescription. Please provide prescription."
+                "One or more products require a prescription. Please provide a prescription."
             )
         
         if prescription:
@@ -220,19 +221,19 @@ class SaleSerializer(serializers.ModelSerializer):
                     f"Prescription must be verified before sale. Current status: {prescription.status}"
                 )
             
-            # Validate items match prescription
+            # FIX: Only verify items that ACTUALLY require a prescription, 
+            # allowing OTC items (like tissues) to be in the same sale.
             prescription_products = set(
-                item.product_id for item in prescription.items.all()
+                item.product_id for item in prescription.items.all() if item.product_id
             )
-            sale_products = set(
+            rx_sale_products = set(
                 item_data.get('product').id for item_data in items_data 
-                if item_data.get('product')
+                if item_data.get('product') and item_data.get('product').effective_requires_prescription
             )
             
-            # Check if sale items are in prescription
-            if not sale_products.issubset(prescription_products):
+            if not rx_sale_products.issubset(prescription_products):
                 raise serializers.ValidationError(
-                    "Some products are not in the prescription."
+                    "Some products requiring a prescription are not in the provided prescription."
                 )
         
         return data
@@ -241,13 +242,8 @@ class SaleSerializer(serializers.ModelSerializer):
     @transaction.atomic()
     def create(self, validated_data):
         items_data = validated_data.pop('items')
-        
-        # Generate sale number
-        import datetime
-        today = datetime.date.today()
-        count = Sale.objects.filter(created_at__date=today).count() + 1
-        validated_data['sale_number'] = f"INV-{today.strftime('%Y%m%d')}-{count:04d}"
-        
+
+
         # Create sale
         sale = Sale.objects.create(**validated_data)
         
@@ -273,9 +269,9 @@ class SaleSerializer(serializers.ModelSerializer):
 
         # Update items if provided
         if items_data is not None:
-            # Delete existing items
+            # Delete existing items (SaleItem.delete() safely reverses stock)
             instance.items.all().delete()
-            # Create new items
+            # Create new items (SaleItem.create() safely deducts stock)
             for item_data in items_data:
                 SaleItem.objects.create(sale=instance, **item_data)
 
@@ -397,7 +393,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
 
 class StockMovementSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
-    supplier_name = serializers.ReadOnlyField(source='supplier.name')
+    supplier_name = serializers.ReadOnlyField(source='suppliers.name')
     sale_number = serializers.ReadOnlyField(source='sale.sale_number')
     created_by_name = serializers.SerializerMethodField()
     is_stock_in = serializers.ReadOnlyField()
@@ -411,7 +407,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
     )
     supplier_id = serializers.PrimaryKeyRelatedField(
         queryset=Supplier.objects.all(),
-        source='supplier',
+        source='suppliers',
         write_only=True,
         allow_null=True,
         required=False
