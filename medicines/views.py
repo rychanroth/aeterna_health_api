@@ -55,6 +55,75 @@ class UserViewSet(viewsets.ModelViewSet):
 
 # ModelViewSet automatically provides list(), create(), retrieve(), update(), partial_update(), destroy()
 # When registered with Router, it dynamically generates the URL PATTERNS!
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    queryset = Supplier.objects.all()
+    serializer_class = SupplierSerializer
+    permission_classes = [IsAuthenticated]
+
+    # Custom Permission
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdminUser]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    # Custom Action
+    @action(detail=True, methods=['get'])
+    def products(self, request, pk=None):
+        """Get all products from this supplier"""
+        supplier = self.get_object()
+        products = supplier.products.filter(is_active=True)
+        serializer = ProductSerializer(products, many=True)
+        return Response(serializer.data)
+
+class ProductTypeViewSet(viewsets.ModelViewSet):
+    queryset = ProductType.objects.all()
+    serializer_class = ProductTypeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdminUser]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    @action(detail=True, methods=['get'])
+    def root_categories(self, request, pk):
+        """Get all root categories of a producttype"""
+        product_type = self.get_object()
+        categories = product_type.categories.filter(parent=None, is_active=True)
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def categories(self, request, pk):
+        """Get all categories of a producttype"""
+        product_type = self.get_object()
+        categories = product_type.categories.filter(is_active=True)
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
+
+    def get_queryset(self):
+        """Filter products by type flag"""
+        queryset = ProductType.objects.all()
+
+        requires_expiration = self.request.query_params.get('requires_expiration')
+        if requires_expiration is not None:
+            queryset = queryset.filter(requires_expiration=requires_expiration.lower() == 'true')
+
+        requires_prescription = self.request.query_params.get('requires_prescription')
+        if requires_prescription is not None:
+            queryset = queryset.filter(requires_prescription=requires_prescription.lower() == 'true')
+
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        return queryset
+    
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -94,63 +163,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
         product_type_id = self.request.query_params.get('product_type')
         if product_type_id:
             queryset = queryset.filter(product_type_id=product_type_id)
-
-        # Filter by active status
-        is_active = self.request.query_params.get('is_active')
-        if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == 'true')
-
-        return queryset
-class SupplierViewSet(viewsets.ModelViewSet):
-    queryset = Supplier.objects.all()
-    serializer_class = SupplierSerializer
-    permission_classes = [IsAuthenticated]
-
-    # Custom Permission
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAdminUser]
-        else:
-            permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
-    
-    # Custom Action
-    @action(detail=True, methods=['get'])
-    def products(self, request, pk=None):
-        """Get all products from this supplier"""
-        supplier = self.get_object()
-        products = supplier.products.filter(is_active=True)
-        serializer = ProductSerializer(products, many=True)
-        return Response(serializer.data)
-
-class ProductTypeViewSet(viewsets.ModelViewSet):
-    queryset = ProductType.objects.all()
-    serializer_class = ProductTypeSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAdminUser]
-        else:
-            permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
-    
-    # Overidding Methods
-    def get_queryset(self):
-        """Filter products by type flag"""
-        queryset = ProductType.objects.all()
-
-        # Filter by expiration requirement
-        requires_expiration = self.request.query_params.get('requires_expiration')
-        if requires_expiration is not None:
-            queryset = queryset.filter(requires_expiration=requires_expiration.lower() == 'true')
-
-        # Filter by prescription requirement
-        requires_prescription = self.request.query_params.get('requires_prescription')
-        if requires_prescription is not None:
-            queryset = queryset.filter(
-                requires_prescription=requires_prescription.lower() == 'true'
-            )
 
         # Filter by active status
         is_active = self.request.query_params.get('is_active')
