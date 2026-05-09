@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum, Count, Avg, F, Q
 from django.utils import timezone
 from datetime import timedelta
@@ -8,10 +9,20 @@ from .models import *
 from django.db.models.functions import TruncDate, TruncMonth
 
 
+def safe_int(value, default):
+    """Conventional workaround to prevent 500 errors from bad query parameters"""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 class ReportViewSet(viewsets.ViewSet):
     """Analytics and reporting endpoints"""
-
     
+    # FIX: Reports contain sensitive business data; restrict to authenticated users
+    permission_classes = [IsAuthenticated]
+
     @action(detail=False, methods=['get'])
     def sales_summary(self, request):
         """
@@ -24,9 +35,10 @@ class ReportViewSet(viewsets.ViewSet):
         sales = Sale.objects.all()
 
         if start_date:
-            sales = sales.filter(created_at__gte=start_date)
+            sales = sales.filter(created_at__date__gte=start_date)
+        # FIX: Use __date__lte to include the entirety of the end date (previously cut off at 00:00:00)
         if end_date:
-            sales = sales.filter(created_at__lte=end_date)
+            sales = sales.filter(created_at__date__lte=end_date)
 
         summary = sales.aggregate(
             total_sales=Count('id'),
@@ -53,14 +65,15 @@ class ReportViewSet(viewsets.ViewSet):
             },
             'daily_breakdown': list(daily_sales)
         })
-    
+
     @action(detail=False, methods=['get'])
     def top_products(self, request):
         """
         Top selling products by quantity.
         Usage: /api/reports/top_products/?limit=10
         """
-        limit = int(request.query_params.get('limit', 10))
+        # FIX: Use safe_int to prevent ValueError crash if user passes ?limit=abc
+        limit = safe_int(request.query_params.get('limit'), 10)
 
         top_items = (
             SaleItem.objects
@@ -82,17 +95,19 @@ class ReportViewSet(viewsets.ViewSet):
         Low stock and expiring products alerts.
         Usage: /api/reports/stock_alerts/?low_threshold=50&days_ahead=90
         """
-        low_threshold = int(request.query_params.get('low_threshold', 50))
-        days_ahead = int(request.query_params.get('days_ahead', 90))
+        # FIX: Use safe_int to prevent crash on bad inputs
+        low_threshold = safe_int(request.query_params.get('low_threshold'), 50)
+        days_ahead = safe_int(request.query_params.get('days_ahead'), 90)
 
-        expiration_date = timezone.now().date() + timedelta(days=days_ahead)
+        # FIX: Renamed variable to prevent shadowing the Django model field 'expiration_date'
+        expiry_cutoff_date = timezone.now().date() + timedelta(days=days_ahead)
 
         low_stock = Product.objects.filter(
             stock_quantity__lte=low_threshold
         ).values('id', 'name', 'stock_quantity', 'base_unit', 'product_type__name')
 
         expiring_soon = Product.objects.filter(
-            expiration_date__lte=expiration_date,
+            expiration_date__lte=expiry_cutoff_date,
             expiration_date__gt=timezone.now().date()
         ).values('id', 'name', 'expiration_date', 'stock_quantity', 'product_type__name')
 
@@ -120,8 +135,9 @@ class ReportViewSet(viewsets.ViewSet):
             .order_by('status')
         )
 
+        # Minor convention: Use the model's constant instead of hardcoded string
         pending_recent = Prescription.objects.filter(
-            status='pending'
+            status=Prescription.Status.PENDING
         ).order_by('-created_at')[:10].values(
             'id', 'prescription_number', 'created_at',
             'doctor__name', 'patient__name'
@@ -138,7 +154,8 @@ class ReportViewSet(viewsets.ViewSet):
         Monthly revenue trend.
         Usage: /api/reports/monthly_revenue/?year=2024
         """
-        year = request.query_params.get('year', timezone.now().year)
+        # FIX: Use safe_int to prevent crash if user passes ?year=abc
+        year = safe_int(request.query_params.get('year'), timezone.now().year)
 
         monthly = (
             Sale.objects
