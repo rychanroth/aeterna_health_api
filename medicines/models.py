@@ -32,7 +32,16 @@ class User(AbstractUser):
     def is_cashier(self):
         return self.role == self.Role.CASHIER
 
-class Category(models.Model):
+
+class CoreModel(models.Model):
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+class Category(CoreModel):
     name = models.CharField(max_length=200)
     parent = models.ForeignKey(
         'self', # foreign key to ITSELF
@@ -47,8 +56,6 @@ class Category(models.Model):
         related_name='categories',
         verbose_name='product type'
     )
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'categories'
@@ -64,12 +71,10 @@ class Category(models.Model):
     def __str__(self):
         return self.name
     
-class Supplier(models.Model):
+class Supplier(CoreModel):
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=30, blank=True)
     address = models.CharField(max_length=300, blank=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'suppliers'
@@ -79,7 +84,7 @@ class Supplier(models.Model):
         return self.name
 
 # ProductType
-class ProductType(models.Model):
+class ProductType(CoreModel):
     name = models.CharField(max_length=50, unique=True)
     description = models.CharField(max_length=200, blank=True)
     requires_expiration = models.BooleanField(
@@ -90,8 +95,6 @@ class ProductType(models.Model):
         default=False,
         help_text="Product of this type requires a prescription to purchase"
     )
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'producttypes'
@@ -100,7 +103,7 @@ class ProductType(models.Model):
     def __str__(self):
         return self.name
     
-class Product(models.Model):
+class Product(CoreModel):
     class BaseUnit(models.TextChoices):
         # Medicine - Oral
         TABLET = 'tablet', 'Tablet'
@@ -179,8 +182,6 @@ class Product(models.Model):
     stock_quantity = models.IntegerField(default=0)
     expiration_date = models.DateField(null=True, blank=True)
     requires_prescription = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         db_table = 'products'
@@ -232,7 +233,7 @@ class Product(models.Model):
         super().save(*args, **kwargs)
 
 
-class Sale(models.Model):
+class Sale(CoreModel):
     class PaymentMethod(models.TextChoices):
         CASH = 'cash', 'Cash'
         CARD = 'card', 'Card'
@@ -268,7 +269,7 @@ class Sale(models.Model):
         """Sum total of all items subtotal"""
         return sum(item.subtotal for item in self.items.all())
     
-class SaleItem(models.Model):
+class SaleItem(CoreModel):
     sale = models.ForeignKey(
         'Sale', 
         on_delete=models.CASCADE,
@@ -381,14 +382,12 @@ class SaleItem(models.Model):
         return f"{self.sale.sale_number} - {self.product}"
 
 # === Doctor and Patient ===
-class Doctor(models.Model):
+class Doctor(CoreModel):
     name = models.CharField(max_length=150)
     license_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     phone = models.CharField(max_length=30, blank=True)
     clinic_name = models.CharField(max_length=200, blank=True)
     clinic_address = models.CharField(max_length=300, blank=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'doctors'
@@ -397,7 +396,7 @@ class Doctor(models.Model):
     def __str__(self):
         return self.name
     
-class Patient(models.Model):
+class Patient(CoreModel):
     class Gender(models.TextChoices):
         MALE = 'male', 'Male'
         FEMALE = 'female', 'Female'
@@ -413,8 +412,6 @@ class Patient(models.Model):
     )
     address = models.CharField(max_length=300, blank=True)
     allergy_notes = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'patients'
@@ -432,7 +429,7 @@ class Patient(models.Model):
             return today.year - self.date_of_birth.year  - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
         return None
 
-class Prescription(models.Model):
+class Prescription(CoreModel):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
         VERIFIED = 'verified', 'Verified'
@@ -468,7 +465,6 @@ class Prescription(models.Model):
         related_name='verified_prescriptions'
     )
     notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if not self.pk:
@@ -485,7 +481,7 @@ class Prescription(models.Model):
     def __str__(self):
         return self.prescription_number
     
-class PrescriptionItem(models.Model):
+class PrescriptionItem(CoreModel):
     prescription = models.ForeignKey(
         'Prescription',
         on_delete=models.CASCADE,
@@ -509,7 +505,7 @@ class PrescriptionItem(models.Model):
         return f"{self.prescription.prescription_number} - {product_name}"
     
 # === STOCK MOVEMENT ===
-class StockMovement(models.Model):
+class StockMovement(CoreModel):
     class Type(models.TextChoices):
         IN = 'in', 'Stock In'
         OUT  = 'out', 'Stock Out'
@@ -580,7 +576,6 @@ class StockMovement(models.Model):
         null=True,
         related_name='stock_movements'
     )
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'stock_movements'
