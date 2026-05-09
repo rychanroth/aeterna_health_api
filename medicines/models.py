@@ -256,7 +256,6 @@ class Sale(CoreModel):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'sales'
@@ -268,6 +267,15 @@ class Sale(CoreModel):
     def calculate_total(self):
         """Sum total of all items subtotal"""
         return sum(item.subtotal for item in self.items.all())
+
+    def save(self, *args, **kwargs):
+        # Auto-generate sale number matching Prescription pattern
+        if not self.pk:
+            import datetime
+            today = datetime.date.today()
+            count = Sale.objects.filter(created_at__date=today).count() + 1
+            self.sale_number = f"SL-{today.strftime('%Y%m%d')}-{count:04d}"
+        super().save(*args, **kwargs)
     
 class SaleItem(CoreModel):
     sale = models.ForeignKey(
@@ -292,7 +300,7 @@ class SaleItem(CoreModel):
         """Validate stock availability before save"""
         super().clean()
         
-        if self.product and self.quantity:
+        if self.product and self.quantity is not None:
             if self.product.stock_quantity < self.quantity:
                 raise ValidationError({
                     'quantity': f'Insufficient stock. Available: {self.product.stock_quantity} {self.product.base_unit}(s)'
@@ -304,79 +312,68 @@ class SaleItem(CoreModel):
         self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
         
         is_new = self.pk is None
-        old_quantity = 0
-        old_product = None
+        old_item = None
         
         # Get old quantity if updating
         if not is_new:
             try:
                 old_item = SaleItem.objects.get(pk=self.pk)
-                old_quantity = old_item.quantity
-                old_product = old_item.product
             except SaleItem.DoesNotExist:
                 pass
         
         with transaction.atomic():
             from django.db import transaction
+
+            # FIX: If updating, find and delete the old StockMovement to safely reverse stock
+            if old_item and old_item.product:
+                old_movement = StockMovement.objects.filter(
+                    sale=self.sale,
+                    product=old_item.product,
+                    movement_type=StockMovement.Reason.SALE,
+                    quantity=old_item.quantity,
+                    created_at=old_item.created_at
+                ).first()
+                if old_movement:
+                    old_movement.delete() # StockMovement.delete() now handles reversing the stock
+
             super().save(*args, **kwargs)
             
-            # Update product stock (deduct for new, adjust for update)
+            # FIX: Only create the StockMovement. Do NOT manually edit stock_quantity here.
             if self.product:
-                if is_new:
-                    if self.product.stock_quantity < self.quantity:
-                        raise ValidationError({
-                            f'Insufficient stock for {self.product.name}'
-                        })
-                    
-                    # New item: deduct stock
-                    self.product.stock_quantity -= self.quantity
-                    self.product.save(update_fields=['stock_quantity'])
+                if self.product.stock_quantity < self.quantity:
+                    raise ValidationError(f'Insufficient stock for {self.product.name}')
 
-                    # Create StockMovement audit record
-                    StockMovement.objects.create(
-                        product=self.product,
-                        movement_type=StockMovement.Reason.SALE,
-                        quantity=self.quantity,
-                        sale=self.sale,
-                        notes=f'Auto-created from Sale #{self.sale.sale_number}',
-                        created_by=self.sale.cashier
-                    )
-                else:
-                    # Update: adjust by difference
-                    if old_product and old_product != self.product:
-                        # Product changed: restore old, deduct new
-                        old_product.stock_quantity += old_quantity
-                        old_product.save(update_fields=['stock_quantity'])
-                        
-                        self.product.stock_quantity -= self.quantity
-                        self.product.save(update_fields=['stock_quantity'])
-                    elif old_quantity != self.quantity:
-                        # Same product, quantity changed: adjust difference
-                        quantity_diff = old_quantity - self.quantity
-                        self.product.stock_quantity += quantity_diff
-                        self.product.save(update_fields=['stock_quantity'])
-            
-            # Update sale total
+                StockMovement.objects.create(
+                    product=self.product,
+                    movement_type=StockMovement.Reason.SALE,
+                    quantity=self.quantity,
+                    sale=self.sale,
+                    notes=f'Auto-created from Sale #{self.sale.sale_number}',
+                    created_by=self.sale.cashier
+                )
+
             self.sale.total_amount = self.sale.calculate_total()
             self.sale.save(update_fields=['total_amount'])
 
     def delete(self, *args, **kwargs):
-        """Delete with transaction and restore stock"""
-        from django.db import transaction
-        
         with transaction.atomic():
+            # FIX: Find the audit log and delete it. Its delete() method will restore the stock.
             if self.product:
-                self.product.stock_quantity += self.quantity
-                self.product.save(update_fields=['stock_quantity'])
+                movement = StockMovement.objects.filter(
+                    sale=self.sale,
+                    product=self.product,
+                    movement_type=StockMovement.Reason.SALE,
+                    quantity=self.quantity,
+                    created_at=self.created_at
+                ).first()
+                if movement:
+                    movement.delete()
 
-            # Store sale reference before deletion
             sale = self.sale
-            
             super().delete(*args, **kwargs)
             
-            # Update sale total
             sale.total_amount = sale.calculate_total()
-            sale.save(update_fields=['total_amount'])  
+            sale.save(update_fields=['total_amount'])
 
     def __str__(self):
         return f"{self.sale.sale_number} - {self.product}"
@@ -469,8 +466,9 @@ class Prescription(CoreModel):
     def save(self, *args, **kwargs):
         if not self.pk:
             import datetime
-            today = datetime.date.today() 
-            count = Prescription.objects.filter(created_at__date=today).count()+1
+            today = datetime.date.today()
+            # FIX: Filter by prescription_date instead of created_at to prevent DB timezone edge cases
+            count = Prescription.objects.filter(prescription_date=today).count() + 1
             self.prescription_number = f"RX-{today.strftime('%Y%m%d')}-{count:04d}"
         return super().save(*args, **kwargs)
 
@@ -613,7 +611,7 @@ class StockMovement(CoreModel):
                 product=product,
                 movement_type=cls.Reason.PURCHASE,
                 quantity=quantity,
-                supplier=supplier,
+                suppliers=supplier,
                 unit_cost=unit_cost,
                 notes=notes,
                 created_by=user
@@ -673,12 +671,21 @@ class StockMovement(CoreModel):
         from django.db import transaction
         is_new = self.pk is None
         self.clean()
-        
+
         with transaction.atomic():
             super().save(*args, **kwargs)
-            
-            # Only update stock if this is a brand-new movement record
+
+            # Single source of truth for stock updates
             if is_new and self.product:
                 change = self.quantity if self.is_stock_in else -self.quantity
                 self.product.stock_quantity += change
                 self.product.save(update_fields=['stock_quantity'])
+
+    def delete(self, *args, **kwargs):
+        # FIX: Conventional Workaround - If an audit log is deleted, reverse the stock change
+        if self.product:
+            change = self.quantity if self.is_stock_in else -self.quantity
+            self.product.stock_quantity -= change  # Reverse the original math
+            self.product.save(update_fields=['stock_quantity'])
+            
+        super().delete(*args, **kwargs)
