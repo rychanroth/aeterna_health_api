@@ -9,6 +9,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import *
 from django.contrib.auth import authenticate
 from django.db import models
+from django.db.models import Q
 
 # === AUTHENTICATION ===
 
@@ -36,7 +37,14 @@ def login(request):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUser] # only Admin can manage users
+
+    # FIX: Allow any authenticated user to get their own info, restrict rest to Admin
+    def get_permissions(self):
+        if self.action == 'me':
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
 
     @action(detail=False, methods=['get'])
     def me(self, request):
@@ -179,7 +187,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         if category_id:
             queryset = queryset.filter(category_id=category_id)
 
-        """Fitler products by product_type"""
+        """Filter products by product_type"""
         product_type_id = self.request.query_params.get('product_type')
         if product_type_id:
             queryset = queryset.filter(product_type_id=product_type_id)
@@ -329,7 +337,7 @@ class SaleViewSet(viewsets.ModelViewSet):
         # Today's statistic
         today_sales = Sale.objects.filter(created_at__date=today)
         today_total = today_sales.aggregate(
-            total=Sum('total_price'),
+            total=Sum('total_amount'),
             count=Count('id')
         )
 
@@ -337,7 +345,7 @@ class SaleViewSet(viewsets.ModelViewSet):
         month_start = today.replace(day=1)
         month_sales = Sale.objects.filter(created_at__date__gte=month_start)
         month_total = month_sales.aggregate(
-            total=Sum('total_price'),
+            total=Sum('total_amount'),
             count=Count('id')
         )
 
@@ -364,8 +372,8 @@ class DoctorViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                models.Q(name__icontains=search) |
-                models.Q(license_number__icontains=search)
+                Q(name__icontains=search) |
+                Q(license_number__icontains=search)
             )
 
         # Filter
@@ -374,14 +382,6 @@ class DoctorViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
 
         return queryset
-    
-    def get_permissions(self):
-        """Only admin and pharmacist can manage doctors"""
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAuthenticated]
-        else:
-            permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
     
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
@@ -395,8 +395,8 @@ class PatientViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                models.Q(name__icontains=search) |
-                models.Q(phone__icontains=search)
+                Q(name__icontains=search) |
+                Q(phone__icontains=search)
             )
 
         # Filter by active status
@@ -409,7 +409,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def with_allergies(self, request):
         """Get patients who have allegy notes"""
-        patients = self.get_queryset().exclude(allergy_notes='')
+        patients = self.get_queryset().exclude(allergy_notes__in=[None, ''])
         serializer = self.get_serializer(patients, many=True)
         return Response(serializer.data)
 
@@ -528,7 +528,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         # Filter by supplier
         supplier_id = self.request.query_params.get('supplier')
         if supplier_id:
-            queryset = queryset.filter(supplier_id=supplier_id)
+            queryset = queryset.filter(suppliers_id=supplier_id)
 
         # Filter by sale
         sale_id = self.request.query_params.get('sale')
