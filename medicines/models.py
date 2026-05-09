@@ -671,5 +671,14 @@ class StockMovement(CoreModel):
     
     def save(self, *args, **kwargs):
         from django.db import transaction
+        is_new = self.pk is None
         self.clean()
-        super().save(*args, **kwargs)
+        
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            
+            # Only update stock if this is a brand-new movement record
+            if is_new and self.product:
+                change = self.quantity if self.is_stock_in else -self.quantity
+                self.product.stock_quantity += change
+                self.product.save(update_fields=['stock_quantity'])
