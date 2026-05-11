@@ -30,7 +30,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'product_type', 'product_type_id', 'parent', 'parent_id', 'is_active', 'created_at']
+        fields = ['id', 'name', 'product_type', 'product_type_id', 'products_count', 'parent', 'parent_id', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_at']
 
     def get_products_count(self, obj):
