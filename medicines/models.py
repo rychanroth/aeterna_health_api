@@ -113,10 +113,13 @@ class Category(CoreModel):
     
     @property
     def depth(self):
-        """Return nesting level"""
-        if self.parent:
-            return self.parent.depth +1
-        return 1
+        """Calculate depth in category tree with circular reference guard."""
+        if not self.parent_id:
+            return 0
+        # Guard against self-reference (parent_id == self.pk)
+        if self.parent_id == self.pk:
+            return 1  # Or raise error
+        return self.parent.depth + 1
     
     def get_ancestors(self):
         """Return list of all parent categories up to root"""
