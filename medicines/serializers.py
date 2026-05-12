@@ -10,9 +10,14 @@ class UserSerializer(serializers.ModelSerializer):
 
 class CategorySerializer(serializers.ModelSerializer):
     # Read-only
-    parent = serializers.StringRelatedField(read_only=True)
-    product_type = serializers.StringRelatedField(read_only=True)
+    full_path = serializers.ReadOnlyField()
+    depth = serializers.ReadOnlyField()
+    parent_name = serializers.ReadOnlyField(source='parent.name')
+    product_type_name = serializers.ReadOnlyField(source='product_type.name')
+
+    children = serializers.SerializerMethodField()
     products_count = serializers.SerializerMethodField()
+    total_stock = serializers.SerializerMethodField()
     
     # Write-only
     parent_id = serializers.PrimaryKeyRelatedField(
