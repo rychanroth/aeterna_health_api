@@ -108,8 +108,8 @@ class Category(CoreModel):
     def full_path(self):
         """Return full hierarchical path: 'Medicine > Cardiovascular > Antihypertensives'"""
         if self.parent:
-            return f"{self.parent.full_path} - {self.name}"
-        return f"{self.product_type.name} - {self.name}"
+            return f"{self.parent.full_path} > {self.name}"
+        return f"{self.product_type.name} > {self.name}"
     
     @property
     def depth(self):
