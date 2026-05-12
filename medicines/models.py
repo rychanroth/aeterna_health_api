@@ -176,6 +176,34 @@ class Category(CoreModel):
         self.clean()
         super().save(*args, **kwargs)
 
+    # === AGGREGATION HELPERS ===
+
+    def get_all_products(self):
+        """Returns queryset of all products in this category AND all descendants"""
+        from django.db.models import Q
+        
+        # Start with own products
+        category_ids = [self.id]
+        
+        # Add all descendant category IDs
+        for descendant in self.get_descendants():
+            category_ids.append(descendant.id)
+        
+        return Product.objects.filter(category_id__in=category_ids)
+
+    def get_total_stock(self):
+        """Returns total stock quantity for this category and all descendants"""
+        return self.get_all_products().aggregate(
+            total=models.Sum('stock_quantity')
+        )['total'] or 0
+
+    def get_total_value(self):
+        """Returns total inventory value for this category and all descendants"""
+        from django.db.models import F
+        return self.get_all_products().aggregate(
+            total=models.Sum(models.F('stock_quantity') * models.F('selling_price'))
+        )['total'] or 0
+
     
 class Product(CoreModel):
     class BaseUnit(models.TextChoices):
