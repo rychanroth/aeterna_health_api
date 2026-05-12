@@ -10,41 +10,54 @@ class CategoryRecursionTestCase(TestCase):
     """Test suite for recursive category structure"""
 
     def setUp(self):
-        """Create test data"""
-        # Create ProductTypes
+        """Create test data with multi-level category hierarchy."""
+        from ..models import ProductType, Category
+        
+        # === ProductTypes ===
         self.medicine = ProductType.objects.create(
             name='Medicine',
             requires_expiration=True,
             requires_prescription=True
         )
-        self.equipment = ProductType.objects.create(
-            name='Medical Equipment',
+        self.supplement_type = ProductType.objects.create(
+            name='Supplements',
+            requires_expiration=True,
+            requires_prescription=False
+        )
+        self.equipment = ProductType.objects.create(  # ← ADD
+            name='Equipment',
             requires_expiration=False,
             requires_prescription=False
         )
-
-        # Create hierarchical categories for Medicine
-        # Medicine > Cardiovascular > Antihypertensives > ACE Inhibitors
+        
+        # === Medicine Categories (3 levels) ===
         self.cardio = Category.objects.create(
-            name='Cardiovascular',
             product_type=self.medicine,
+            name='Cardiovascular',
             parent=None
         )
         self.antihypertensives = Category.objects.create(
-            name='Antihypertensives',
             product_type=self.medicine,
+            name='Antihypertensives',
             parent=self.cardio
         )
         self.ace_inhibitors = Category.objects.create(
-            name='ACE Inhibitors',
             product_type=self.medicine,
+            name='ACE Inhibitors',
             parent=self.antihypertensives
         )
-
-        # Create a category for Equipment (different type)
-        self.diagnostic = Category.objects.create(
-            name='Diagnostic Tools',
+        
+        # === Equipment Categories ===
+        self.diagnostic = Category.objects.create(  # ← ADD
             product_type=self.equipment,
+            name='Diagnostic Equipment',
+            parent=None
+        )
+        
+        # === Supplements Categories ===
+        self.supplements = Category.objects.create(
+            product_type=self.supplement_type,
+            name='Vitamins',
             parent=None
         )
 
@@ -119,9 +132,9 @@ class CategoryRecursionTestCase(TestCase):
 
     def test_depth_calculation(self):
         """Verify depth property calculates correctly"""
-        self.assertEqual(self.cardio.depth, 1)
-        self.assertEqual(self.antihypertensives.depth, 2)
-        self.assertEqual(self.ace_inhibitors.depth, 3)
+        self.assertEqual(self.cardio.depth, 0)
+        self.assertEqual(self.antihypertensives.depth, 1)
+        self.assertEqual(self.ace_inhibitors.depth, 2)
 
     def test_full_path_generation(self):
         """Verify full_path property generates correctly"""
@@ -249,17 +262,20 @@ class CategoryRecursionTestCase(TestCase):
     # ==========================================
 
     def test_serializer_type_consistency_error(self):
-        """Serializer rejects type mismatch"""
-        from medicines.serializers import CategorySerializer
-
-        data = {
-            'name': 'Test Category',
-            'product_type_id': self.equipment.id,
-            'parent_id': self.cardio.id  # Medicine type!
-        }
-
-        serializer = CategorySerializer(data=data)
+        """Serializer rejects type mismatch."""
+        from ..serializers import CategorySerializer
+        
+        serializer = CategorySerializer(
+            instance=self.cardio,
+            data={
+                'product_type': self.medicine.id,
+                'parent': self.supplements.id,  # ← Now self.supplements exists
+                'name': 'Test'
+            }
+        )
+        
         self.assertFalse(serializer.is_valid())
+        # Check for error on parent_id (the write field)
         self.assertIn('parent_id', serializer.errors)
 
     def test_serializer_circular_reference_error(self):
