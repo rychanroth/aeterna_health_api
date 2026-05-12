@@ -27,9 +27,8 @@ class CategorySerializer(serializers.ModelSerializer):
         allow_null=True,
         required=False
     )
-    product_type_id = serializers.PrimaryKeyRelatedField(
+    product_type = serializers.PrimaryKeyRelatedField(
         queryset=ProductType.objects.all(),
-        source='product_type',
         write_only=True
     )
 
@@ -37,7 +36,7 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = [
             'id', 'name', 'full_path', 'depth',
-            'product_type', 'product_type_name', 'product_type_id',
+            'product_type_name', 'product_type',
             'parent', 'parent_name', 'parent_id',
             'children',
             'products_count', 'total_stock',
