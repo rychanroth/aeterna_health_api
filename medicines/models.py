@@ -148,32 +148,30 @@ class Category(CoreModel):
 
     # === Custom Validations ===
     def clean(self):
-        """Validate category constraints"""
+        """Validate category constraints."""
         from django.core.exceptions import ValidationError
         
-        super().clean()
+        # 1. Self-parent check - MUST use parent_id comparison
+        if self.parent_id is not None and self.parent_id == self.pk:
+            raise ValidationError({'parent': 'Category cannot be its own parent.'})
         
-        # 1. Type Consistency: Parent must belong to same ProductType
-        if self.parent:
-            if self.parent.product_type_id != self.product_type_id:
+        # 2. Type consistency check
+        if self.parent_id:
+            # Fetch parent if not already loaded
+            parent = self.parent if self.parent_id == getattr(self.parent, 'pk', None) else Category.objects.get(pk=self.parent_id)
+            if parent.product_type_id != self.product_type_id:
                 raise ValidationError({
-                    'parent': f'Parent category must belong to the same ProductType ({self.product_type.name}).'
+                    'parent': f'Parent must belong to same ProductType.'
                 })
+            
+            # 3. Circular reference check (parent is among descendants)
+            descendants = self.get_descendants() if self.pk else []
+            if parent in descendants:
+                raise ValidationError({'parent': 'Circular reference detected.'})
         
-        # 2. Circular Reference: Cannot be own ancestor
-        if self.pk:
-            # Get all descendants
-            descendants = self.get_descendants()
-            if self.parent and self.parent in descendants:
-                raise ValidationError({
-                    'parent': 'Circular reference detected: a category cannot be its own descendant.'
-                })
-        
-        # 3. Depth Limit
+        # 4. Depth limit
         if self.depth > 5:
-            raise ValidationError({
-                'parent': 'Maximum category depth exceeded (5 levels).'
-            })
+            raise ValidationError({'parent': 'Maximum depth (5) exceeded.'})
 
     def save(self, *args, **kwargs):
         self.clean()
