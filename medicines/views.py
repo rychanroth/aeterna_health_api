@@ -156,13 +156,27 @@ class CategoryViewSet(viewsets.ModelViewSet):
     
     # === Custom Querysets ===
     def get_queryset(self):
-        """Filter categories by producttype"""
         queryset = Category.objects.all()
 
         # Filter by product type
         product_type_id = self.request.query_params.get('product_type')
         if product_type_id:
             queryset = queryset.filter(product_type_id=product_type_id)
+
+        # Filter by depth level
+        depth = self.request.query_params.get('depth')
+        if depth:
+            # Filter categories at specific depth
+            category_ids = [c.id for c in Category.objects.all() if c.depth == int(depth)]
+            queryset = queryset.filter(id__in=category_ids)
+
+        # Filter by parent (for lazy loading)
+        parent_id = self.request.query_params.get('parent')
+        if parent_id:
+            if parent_id == 'null':
+                queryset = queryset.filter(parent__isnull=True)
+            else:
+                queryset = queryset.filter(parent_id=parent_id)
 
         # Filter by active status
         is_active = self.request.query_params.get('is_active')
