@@ -103,6 +103,46 @@ class Category(CoreModel):
     def __str__(self):
         return self.name
     
+    # === Recursive HELPER METHODS ===
+    @property
+    def full_path(self):
+        """Return full hierarchical path: 'Medicine > Cardiovascular > Antihypertensives'"""
+        if self.parent:
+            return f"{self.parent.full_path} - {self.name}"
+        return f"{self.product_type.name} - {self.name}"
+    
+    @property
+    def depth(self):
+        """Return nesting level"""
+        if self.parent:
+            return self.parent.depth +1
+        return 1
+    
+    def get_ancestors(self):
+        """Return list of all parent categories up to root"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return ancestors
+
+    def get_descendants(self):
+        """Return all nested children recursively"""
+        descendants = []
+        for child in self.children.all():
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+    
+    def is_ancestor_of(self, category):
+        """Check if this category is an ancestor of another"""
+        return self in category.get_ancestors()
+    
+    def is_descendant_of(self, category):
+        """Check if this category is a descendant of another"""
+        return category in self.get_ancestors()
+    
 class Product(CoreModel):
     class BaseUnit(models.TextChoices):
         # Medicine - Oral
