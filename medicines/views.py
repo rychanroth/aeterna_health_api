@@ -137,22 +137,145 @@ class CategoryViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAdminUser]
         return [permission() for permission in permission_classes]
 
-    # === Custom Action ===
-    # Function name determines the auto-generated url name e.g. /api/categories/roots/
+    # === Custom Actions ===
+
     @action(detail=False, methods=['get'])
     def roots(self, request):
-        """Get all root categories (category with no parent)"""
-        root_categories = self.queryset.filter(parent__isnull=True)
-        serializer = self.get_serializer(root_categories, many=True)
+        """Get all root categories (no parent)"""
+        queryset = self.get_queryset().filter(parent__isnull=True)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-    
+
+    @action(detail=False, methods=['get'])
+    def tree(self, request):
+        """
+        Get full category tree for a ProductType.
+        Usage: /api/categories/tree/?product_type=1
+        """
+        product_type_id = request.query_params.get('product_type')
+        if not product_type_id:
+            return Response(
+                {'error': 'product_type parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get root categories for this type
+        roots = Category.objects.filter(
+            product_type_id=product_type_id,
+            parent__isnull=True,
+            is_active=True
+        )
+        serializer = self.get_serializer(roots, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def descendants(self, request, pk=None):
+        """Get all descendant categories"""
+        category = self.get_object()
+        descendants = category.get_descendants()
+        serializer = self.get_serializer(descendants, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def ancestors(self, request, pk=None):
+        """Get all ancestor categories (breadcrumb trail)"""
+        category = self.get_object()
+        ancestors = category.get_ancestors()
+        serializer = self.get_serializer(ancestators, many=True)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['get'])
     def products(self, request, pk=None):
-        """Get all products in this category"""
+        """Get all products in this category AND its descendants"""
         category = self.get_object()
-        products = category.products.filter(is_active=True)
+        products = category.get_all_products().filter(is_active=True)
+        
+        # Apply pagination
+        page = self.paginate_queryset(products)
+        if page is not None:
+            serializer = ProductSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def stock_summary(self, request, pk=None):
+        """Get stock summary for this category and all descendants"""
+        category = self.get_object()
+        return Response({
+            'category': category.name,
+            'full_path': category.full_path,
+            'total_products': category.get_all_products().count(),
+            'total_stock': category.get_total_stock(),
+            'total_value': category.get_total_stock(),  # Will update below
+        })
+
+    @action(detail=False, methods=['post'])
+    def bulk_move(self, request):
+        """
+        Move multiple categories to a new parent.
+        Uses transaction.atomic for safety.
+        """
+        from django.db import transaction
+        
+        category_ids = request.data.get('category_ids', [])
+        new_parent_id = request.data.get('new_parent_id')
+        
+        if not category_ids:
+            return Response(
+                {'error': 'category_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        new_parent = None
+        if new_parent_id:
+            try:
+                new_parent = Category.objects.get(id=new_parent_id)
+            except Category.DoesNotExist:
+                return Response(
+                    {'error': 'New parent category not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        with transaction.atomic():
+            moved = []
+            errors = []
+            
+            for cat_id in category_ids:
+                try:
+                    category = Category.objects.get(id=cat_id)
+                    
+                    # Validate type consistency
+                    if new_parent and category.product_type_id != new_parent.product_type_id:
+                        errors.append({
+                            'category_id': cat_id,
+                            'error': 'ProductType mismatch'
+                        })
+                        continue
+                    
+                    # Validate no circular reference
+                    if new_parent and new_parent.is_descendant_of(category):
+                        errors.append({
+                            'category_id': cat_id,
+                            'error': 'Would create circular reference'
+                        })
+                        continue
+                    
+                    category.parent = new_parent
+                    category.save()
+                    moved.append(cat_id)
+                    
+                except Category.DoesNotExist:
+                    errors.append({
+                        'category_id': cat_id,
+                        'error': 'Category not found'
+                    })
+
+        return Response({
+            'moved': moved,
+            'errors': errors
+        })
     
     # === Custom Querysets ===
     def get_queryset(self):
