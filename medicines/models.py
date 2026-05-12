@@ -142,6 +142,40 @@ class Category(CoreModel):
     def is_descendant_of(self, category):
         """Check if this category is a descendant of another"""
         return category in self.get_ancestors()
+
+    # === Custom Validations ===
+    def clean(self):
+        """Validate category constraints"""
+        from django.core.exceptions import ValidationError
+        
+        super().clean()
+        
+        # 1. Type Consistency: Parent must belong to same ProductType
+        if self.parent:
+            if self.parent.product_type_id != self.product_type_id:
+                raise ValidationError({
+                    'parent': f'Parent category must belong to the same ProductType ({self.product_type.name}).'
+                })
+        
+        # 2. Circular Reference: Cannot be own ancestor
+        if self.pk:
+            # Get all descendants
+            descendants = self.get_descendants()
+            if self.parent and self.parent in descendants:
+                raise ValidationError({
+                    'parent': 'Circular reference detected: a category cannot be its own descendant.'
+                })
+        
+        # 3. Depth Limit
+        if self.depth > 5:
+            raise ValidationError({
+                'parent': 'Maximum category depth exceeded (5 levels).'
+            })
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     
 class Product(CoreModel):
     class BaseUnit(models.TextChoices):
