@@ -35,11 +35,76 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'product_type', 'product_type_id', 'products_count', 'parent', 'parent_id', 'is_active', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = [
+            'id', 'name', 'full_path', 'depth',
+            'product_type', 'product_type_name', 'product_type_id',
+            'parent', 'parent_name', 'parent_id',
+            'children',
+            'products_count', 'total_stock',
+            'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    # === Helper Methods ===
+    def get_children(self, obj):
+        """Recursively serialize children"""
+        children = obj.children.filter(is_active=True)
+        return CategorySerializer(children, many=True).data
 
     def get_products_count(self, obj):
-        return obj.products.count()
+        """Count products including descendants"""
+        return obj.get_all_products().count()
+
+    def get_total_stock(self, obj):
+        """Total stock including descendants"""
+        return obj.get_total_stock()
+
+    def validate(self, data):
+        """
+        Custom validation for recursive integrity:
+        1. Type consistency
+        2. Circular reference prevention
+        """
+        data = super().validate(data)
+        
+        parent = data.get('parent')
+        product_type = data.get('product_type')
+        instance = self.instance  # For updates
+        
+        # Type Consistency Check
+        if parent and product_type:
+            if parent.product_type_id != product_type.id:
+                raise serializers.ValidationError({
+                    'parent_id': f'Parent must belong to the same ProductType. '
+                                f'Parent is in "{parent.product_type.name}", '
+                                f'but you selected "{product_type.name}".'
+                })
+        
+        # Circular Reference Check (for updates)
+        if instance and parent:
+            # Check if new parent is a descendant of this category
+            if parent.is_descendant_of(instance) or parent.id == instance.id:
+                raise serializers.ValidationError({
+                    'parent_id': 'Circular reference detected: '
+                                'a category cannot be its own ancestor.'
+                })
+        
+        return data
+
+    def update(self, instance, validated_data):
+        """
+        Override update to handle parent changes with transaction safety.
+        """
+        from django.db import transaction
+        
+        new_parent = validated_data.get('parent', instance.parent)
+        
+        # If parent is changing, wrap in transaction
+        if 'parent' in validated_data and new_parent != instance.parent:
+            with transaction.atomic():
+                return super().update(instance, validated_data)
+        
+        return super().update(instance, validated_data)
 
 class SupplierSerializer(serializers.ModelSerializer):
     products_count = serializers.SerializerMethodField()
