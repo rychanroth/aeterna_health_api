@@ -10,6 +10,10 @@ from rest_framework.permissions import *
 from django.contrib.auth import authenticate
 from django.db import models
 from django.db.models import Q
+from .permissions import (
+    IsAdmin, IsPharmacist, IsCashier,
+    IsAdminOrPharmacist, IsAdminOrCashier
+)
 
 # === AUTHENTICATION ===
 
@@ -38,12 +42,11 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-    # FIX: Allow any authenticated user to get their own info, restrict rest to Admin
     def get_permissions(self):
         if self.action == 'me':
             permission_classes = [IsAuthenticated]
         else:
-            permission_classes = [IsAdminUser]
+            permission_classes = [IsAdmin]  # Changed from IsAdminUser
         return [permission() for permission in permission_classes]
 
     @action(detail=False, methods=['get'])
@@ -59,33 +62,21 @@ class UserViewSet(viewsets.ModelViewSet):
 class SupplierViewSet(viewsets.ModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
-    permission_classes = [IsAuthenticated]
 
-    # Custom Permission
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAdminUser]
+            permission_classes = [IsAdmin]  # Changed from IsAdminUser
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
     
-    # Custom Action
-    @action(detail=True, methods=['get'])
-    def products(self, request, pk=None):
-        """Get all products from this supplier"""
-        supplier = self.get_object()
-        products = supplier.products.filter(is_active=True)
-        serializer = ProductSerializer(products, many=True)
-        return Response(serializer.data)
-
 class ProductTypeViewSet(viewsets.ModelViewSet):
     queryset = ProductType.objects.all()
     serializer_class = ProductTypeSerializer
-    permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAdminUser]
+            permission_classes = [IsAdmin]  # Changed from IsAdminUser
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
@@ -128,13 +119,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
-    # === Custom Permissions ===
     def get_permissions(self):
-        """Anyone can view, but only authenticated user can add/update/delete"""
-        if self.action in ['list', 'retrieve', 'roots', 'products']:
+        if self.action in ['list', 'retrieve', 'roots', 'products', 'tree', 'descendants', 'ancestors']:
             permission_classes = [IsAuthenticated]
         else:
-            permission_classes = [IsAdminUser]
+            permission_classes = [IsAdmin]  # Changed from IsAdminUser
         return [permission() for permission in permission_classes]
 
     # === Custom Actions ===
@@ -311,15 +300,12 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated]
 
-    # === Custom Permissions ===
     def get_permissions(self):
-        # Admin can do all these
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAdminUser]
+            permission_classes = [IsAdmin | IsPharmacist]  # NEW: Admin OR Pharmacist can manage
         else:
-            permission_classes = [IsAuthenticated]
+            permission_classes = [IsAuthenticated]  # All roles can view
         return [permission() for permission in permission_classes]
 
     # Custom Queryset
@@ -435,13 +421,30 @@ class ProductViewSet(viewsets.ModelViewSet):
 class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
     serializer_class = SaleSerializer
-    permission_classes = [IsAuthenticated]
-    
-    # Custom Queryset
+
+    def get_permissions(self):
+        """
+        Role-based access for Sales:
+        - CREATE: Admin or Cashier
+        - UPDATE/DELETE: Admin only
+        - VIEW: All authenticated users
+        """
+        if self.action == 'create':
+            permission_classes = [IsAdmin | IsCashier]  # NEW: Only Admin or Cashier can create
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin]  # Only Admin can modify/delete
+        else:
+            permission_classes = [IsAuthenticated]  # All can view
+        return [permission() for permission in permission_classes]
+
     def get_queryset(self):
         queryset = Sale.objects.all()
 
-        """Filter sales by date range"""
+        # Cashiers see only their own sales by default
+        if self.request.user.role == 'cashier':
+            queryset = queryset.filter(cashier=self.request.user)
+
+        # Admin/Pharmacist can see all sales with filters
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         if start_date:
@@ -449,15 +452,14 @@ class SaleViewSet(viewsets.ModelViewSet):
         if end_date:
             queryset = queryset.filter(created_at__lte=end_date)
 
-        """Filter sales by cashier"""
         cashier_id = self.request.query_params.get('cashier')
         if cashier_id:
             queryset = queryset.filter(cashier_id=cashier_id)
 
         return queryset
-    
-    # Custom Logic
+
     def perform_create(self, serializer):
+        """Auto-assign cashier to current user"""
         serializer.save(cashier=self.request.user)
 
     # Custom Actions
@@ -512,7 +514,13 @@ class SaleViewSet(viewsets.ModelViewSet):
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
-    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin | IsPharmacist]  # NEW: Admin or Pharmacist
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         queryset = Doctor.objects.all()
@@ -535,7 +543,13 @@ class DoctorViewSet(viewsets.ModelViewSet):
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
-    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin | IsPharmacist]  # NEW: Admin or Pharmacist
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         queryset = Patient.objects.all()
@@ -565,7 +579,21 @@ class PatientViewSet(viewsets.ModelViewSet):
 class PrescriptionViewSet(viewsets.ModelViewSet):
     queryset = Prescription.objects.all()
     serializer_class = PrescriptionSerializer
-    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """
+        Role-based access for Prescriptions:
+        - CREATE/UPDATE/DELETE: Admin or Pharmacist
+        - VERIFY/REJECT: Admin or Pharmacist ONLY
+        - VIEW: All authenticated users
+        """
+        if self.action in ['verify', 'reject']:
+            permission_classes = [IsAdmin | IsPharmacist]  # NEW: Enforce pharmacist check
+        elif self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin | IsPharmacist]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         queryset = Prescription.objects.all()
@@ -650,7 +678,21 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
 class StockMovementViewSet(viewsets.ModelViewSet):
     queryset = StockMovement.objects.all()
     serializer_class = StockMovementSerializer
-    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """
+        Role-based access for Stock Movements:
+        - CREATE: Admin or Pharmacist (for adjustments, purchases)
+        - DELETE: Admin only (reverses stock)
+        - VIEW: All authenticated users
+        """
+        if self.action == 'create':
+            permission_classes = [IsAdmin | IsPharmacist]  # NEW: Only Admin/Pharmacist can create
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin]  # Only Admin can modify/delete
+        else:
+            permission_classes = [IsAuthenticated]  # All can view
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         queryset = StockMovement.objects.all()
