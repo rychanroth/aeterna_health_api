@@ -170,7 +170,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         """Get all ancestor categories (breadcrumb trail)"""
         category = self.get_object()
         ancestors = category.get_ancestors()
-        serializer = self.get_serializer(ancestators, many=True)
+        serializer = self.get_serializer(ancestors, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
