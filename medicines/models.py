@@ -428,11 +428,7 @@ class SaleItem(CoreModel):
             # FIX: If updating, find and delete the old StockMovement to safely reverse stock
             if old_item and old_item.product:
                 old_movement = StockMovement.objects.filter(
-                    sale=self.sale,
-                    product=old_item.product,
-                    movement_type=StockMovement.Reason.SALE,
-                    quantity=old_item.quantity,
-                    created_at=old_item.created_at
+                    sale_item=self
                 ).first()
                 if old_movement:
                     old_movement.delete() # StockMovement.delete() now handles reversing the stock
@@ -442,13 +438,16 @@ class SaleItem(CoreModel):
             # FIX: Only create the StockMovement. Do NOT manually edit stock_quantity here.
             if self.product:
                 if self.product.stock_quantity < self.quantity:
-                    raise ValidationError(f'Insufficient stock for {self.product.name}')
+                    raise ValidationError({
+                        'quantity': f'Insufficient stock for {self.product.name}'
+                    })
 
                 StockMovement.objects.create(
                     product=self.product,
                     movement_type=StockMovement.Reason.SALE,
                     quantity=self.quantity,
                     sale=self.sale,
+                    sale_item=self,
                     notes=f'Auto-created from Sale #{self.sale.sale_number}',
                     created_by=self.sale.cashier
                 )
@@ -458,21 +457,17 @@ class SaleItem(CoreModel):
 
     def delete(self, *args, **kwargs):
         with transaction.atomic():
-            # FIX: Find the audit log and delete it. Its delete() method will restore the stock.
+            # FIX: Use sale_item field for consistent lookup
             if self.product:
                 movement = StockMovement.objects.filter(
-                    sale=self.sale,
-                    product=self.product,
-                    movement_type=StockMovement.Reason.SALE,
-                    quantity=self.quantity,
-                    created_at=self.created_at
+                    sale_item=self  # ← Use sale_item, same as in save()
                 ).first()
                 if movement:
                     movement.delete()
 
             sale = self.sale
             super().delete(*args, **kwargs)
-            
+
             sale.total_amount = sale.calculate_total()
             sale.save(update_fields=['total_amount'])
 
@@ -655,6 +650,12 @@ class StockMovement(CoreModel):
         blank=True,
         related_name='stock_movements',
         help_text="For OUT movements from Sales"
+    )
+    sale_item = models.ForeignKey(
+        'SaleItem',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
     )
     quantity = models.IntegerField() 
     unit_cost = models.DecimalField(
