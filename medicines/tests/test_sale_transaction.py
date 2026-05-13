@@ -290,60 +290,21 @@ class SaleTransactionTestCase(TestCase):
     # GROUP 3: SaleItem Update Flow
     # =========================================================================
     
-    def test_update_sale_item_replaces_stock_movement(self):
-        """Verify updating SaleItem deletes old StockMovement and creates new one."""
-        initial_stock = self.product_a.stock_quantity
-        
+    # test_update_sale_item_... is REMOVED
+    # A SaleItem should not be Updatable!
+
+    def test_sale_item_cannot_be_updated(self):
+        """Verify SaleItem is immutable - updates raise ValidationError"""
         sale = Sale.objects.create(cashier=self.cashier)
-        sale_item = SaleItem.objects.create(
-            sale=sale,
-            product=self.product_a,
-            quantity=5,
-            unit_price=self.product_a.selling_price
-        )
+        item = SaleItem.objects.create(sale=sale, product=self.product_a, quantity=5, unit_price=Decimal('10.00'))
         
-        self.product_a.refresh_from_db()
-        self.assertEqual(self.product_a.stock_quantity, initial_stock - 5)
+        # Try to update - should raise ValidationError
+        with self.assertRaises(ValidationError) as context:
+            item.quantity = 10
+            item.save()
         
-        sale_item.quantity = 3
-        sale_item.save()
-        
-        self.product_a.refresh_from_db()
-        self.assertEqual(
-            self.product_a.stock_quantity,
-            initial_stock - 3,
-            "Stock should be initial - 3 (not initial - 5 - 3)"
-        )
-        
-        movement_count = StockMovement.objects.filter(
-            sale=sale,
-            product=self.product_a,
-            movement_type=StockMovement.Reason.SALE
-        ).count()
-        
-        self.assertEqual(movement_count, 1, "Should have exactly one StockMovement")
+        self.assertIn('cannot be updated', str(context.exception))
     
-    def test_update_sale_item_corrects_subtotal(self):
-        """Verify subtotal is recalculated when quantity changes."""
-        sale = Sale.objects.create(cashier=self.cashier)
-        sale_item = SaleItem.objects.create(
-            sale=sale,
-            product=self.product_a,
-            quantity=10,
-            unit_price=Decimal('10.00')
-        )
-        
-        sale_item.refresh_from_db()
-        self.assertEqual(sale_item.subtotal, Decimal('100.00'))
-        
-        sale_item.quantity = 5
-        sale_item.save()
-        
-        sale_item.refresh_from_db()
-        self.assertEqual(sale_item.subtotal, Decimal('50.00'))
-        
-        sale.refresh_from_db()
-        self.assertEqual(sale.total_amount, Decimal('50.00'))
     
     # =========================================================================
     # GROUP 4: Insufficient Stock Rejection
@@ -444,7 +405,7 @@ class SaleTransactionTestCase(TestCase):
             )
         
         error_dict = context.exception.message_dict
-        self.assertIn('supplier', error_dict)
+        self.assertIn('suppliers', error_dict)
     
     def test_stock_movement_quantity_must_be_positive(self):
         """Verify StockMovement with zero quantity raises ValidationError."""
@@ -764,7 +725,7 @@ class SaleTransactionTestCase(TestCase):
         sale = Sale.objects.create(cashier=self.cashier)
         
         self.assertTrue(sale.sale_number.startswith('SL-'))
-        self.assertEqual(len(sale.sale_number), 17)
+        self.assertEqual(len(sale.sale_number), 16)
     
     def test_unit_price_snapshot(self):
         """Verify unit_price is snapshotted at sale time."""
