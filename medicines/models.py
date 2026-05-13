@@ -409,33 +409,23 @@ class SaleItem(CoreModel):
                 })
     
     def save(self, *args, **kwargs):
-        """Save with transaction and auto-create StockMovement"""
+        """
+        SaleItem is IMMUTABLE - cannot be updated.
+        To change: delete old item and create new one.
+        """
+        # BLOCK UPDATES
+        if self.pk is not None:
+            raise ValidationError(
+                "SaleItem cannot be updated. Delete and create a new one instead."
+            )
+        
         # Calculate subtotal
         self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
-        
-        is_new = self.pk is None
-        old_item = None
-        
-        # Get old quantity if updating
-        if not is_new:
-            try:
-                old_item = SaleItem.objects.get(pk=self.pk)
-            except SaleItem.DoesNotExist:
-                pass
-        
+
         with transaction.atomic():
-
-            # FIX: If updating, find and delete the old StockMovement to safely reverse stock
-            if old_item and old_item.product:
-                old_movement = StockMovement.objects.filter(
-                    sale_item=self
-                ).first()
-                if old_movement:
-                    old_movement.delete() # StockMovement.delete() now handles reversing the stock
-
             super().save(*args, **kwargs)
-            
-            # FIX: Only create the StockMovement. Do NOT manually edit stock_quantity here.
+
+            # Create StockMovement (only for new items)
             if self.product:
                 if self.product.stock_quantity < self.quantity:
                     raise ValidationError({
@@ -456,12 +446,10 @@ class SaleItem(CoreModel):
             self.sale.save(update_fields=['total_amount'])
 
     def delete(self, *args, **kwargs):
+        """Delete SaleItem and restore stock"""
         with transaction.atomic():
-            # FIX: Use sale_item field for consistent lookup
             if self.product:
-                movement = StockMovement.objects.filter(
-                    sale_item=self  # ← Use sale_item, same as in save()
-                ).first()
+                movement = StockMovement.objects.filter(sale_item=self).first()
                 if movement:
                     movement.delete()
 
