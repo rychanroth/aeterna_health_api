@@ -1,8 +1,7 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser
 from decimal import Decimal
 from django.core.exceptions import ValidationError
-from django.db import transaction
 
 # Create your models here.
 
@@ -425,7 +424,6 @@ class SaleItem(CoreModel):
                 pass
         
         with transaction.atomic():
-            from django.db import transaction
 
             # FIX: If updating, find and delete the old StockMovement to safely reverse stock
             if old_item and old_item.product:
@@ -759,9 +757,9 @@ class StockMovement(CoreModel):
             })
         
         # OUT movements should have sale or manual reference
-        if self.is_stock_out and self.supplier:
+        if self.is_stock_out and self.suppliers:
             raise ValidationError({
-                'supplier': 'Supplier reference should not be set for stock OUT movements.'
+                'suppliers': 'Supplier reference should not be set for stock OUT movements.'
             })
         
         # Quantity must be positive
