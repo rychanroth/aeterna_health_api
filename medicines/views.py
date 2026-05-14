@@ -197,7 +197,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
             'full_path': category.full_path,
             'total_products': category.get_all_products().count(),
             'total_stock': category.get_total_stock(),
-            'total_value': category.get_total_stock(),  # Will update below
+            'total_value': category.get_total_value(),  # Will update below
         })
 
     @action(detail=False, methods=['post'])
@@ -572,7 +572,8 @@ class PatientViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def with_allergies(self, request):
         """Get patients who have allegy notes"""
-        patients = self.get_queryset().exclude(allergy_notes__in=[None, ''])
+        from django.db.models import Q
+        patients = self.get_queryset().exclude(Q(allergy_notes__isnull=True) | Q(allergy_notes=''))
         serializer = self.get_serializer(patients, many=True)
         return Response(serializer.data)
 
