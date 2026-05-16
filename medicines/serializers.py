@@ -8,11 +8,30 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'phone']
         read_only_fields = ['id']
 
+class ProductTypeSerializer(serializers.ModelSerializer):
+    products_count = serializers.SerializerMethodField()
+    categories_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductType
+        fields = ['id', 'name', 'description',
+            'requires_prescription', 'requires_expiration',
+            'products_count', 'categories_count',
+            'is_active', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_products_count(self, obj):
+        return obj.products.count()
+    
+    def get_categories_count(self, obj):
+        return obj.categories.count()
 class CategorySerializer(serializers.ModelSerializer):
     # Read-only
     full_path = serializers.ReadOnlyField()
     depth = serializers.ReadOnlyField()
     parent_name = serializers.ReadOnlyField(source='parent.name')
+    product_type = ProductTypeSerializer(read_only=True)
     product_type_name = serializers.ReadOnlyField(source='product_type.name')
 
     children = serializers.SerializerMethodField()
@@ -27,16 +46,19 @@ class CategorySerializer(serializers.ModelSerializer):
         allow_null=True,
         required=False
     )
-    product_type = serializers.PrimaryKeyRelatedField(
+    product_type_id = serializers.PrimaryKeyRelatedField(
         queryset=ProductType.objects.all(),
-        write_only=True
+        source='product_type',
+        write_only=True,
+        allow_null=True,
+        required=False
     )
 
     class Meta:
         model = Category
         fields = [
             'id', 'name', 'full_path', 'depth',
-            'product_type_name', 'product_type',
+            'product_type', 'product_type_id', 'product_type_name',
             'parent', 'parent_name', 'parent_id',
             'children',
             'products_count', 'total_stock',
@@ -115,24 +137,6 @@ class SupplierSerializer(serializers.ModelSerializer):
     def get_products_count(self, obj):
         return obj.products.count()
     
-class ProductTypeSerializer(serializers.ModelSerializer):
-    products_count = serializers.SerializerMethodField()
-    categories_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ProductType
-        fields = ['id', 'name', 'description',
-            'requires_prescription', 'requires_expiration',
-            'products_count', 'categories_count',
-            'is_active', 'created_at'
-        ]
-        read_only_fields = ['id', 'created_at']
-
-    def get_products_count(self, obj):
-        return obj.products.count()
-    
-    def get_categories_count(self, obj):
-        return obj.categories.count()
 
 class ProductSerializer(serializers.ModelSerializer):
     # Nested read-only (GET) for display
