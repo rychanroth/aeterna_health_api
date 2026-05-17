@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework.authtoken',
+    'drf_spectacular',
     
 ]
 
@@ -139,7 +140,36 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated'
-    ]
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', 
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Aeterna Health API',
+    'DESCRIPTION': 'Complete API for the Aeterna Health pharmacy management system.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    
+    # It automatically adds 401/403 to secured endpoints, and 404 to detail routes
+    'ENUM_NAME_OVERRIDES': {
+        'ValidationError': '#/components/schemas/Error',
+    },
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+        'drf_spectacular.hooks.postprocess_global_security',
+        'drf_spectacular.contrib.djangorestframework_camel_case.postprocess_camel_case_names',
+    ],
+    'COMPONENT_SPLIT_REQUEST': True, # Force separates Read/Write schemas
+    'SECURITY': [{'BearerAuth': []}],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'BearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+            }
+        }
+    }
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
+
