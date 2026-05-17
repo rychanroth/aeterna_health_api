@@ -150,16 +150,10 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     
-    # It automatically adds 401/403 to secured endpoints, and 404 to detail routes
-    'ENUM_NAME_OVERRIDES': {
-        'ValidationError': '#/components/schemas/Error',
-    },
-    'POSTPROCESSING_HOOKS': [
-        'drf_spectacular.hooks.postprocess_schema_enums',
-        'drf_spectacular.hooks.postprocess_global_security',
-        'drf_spectacular.contrib.djangorestframework_camel_case.postprocess_camel_case_names',
-    ],
-    'COMPONENT_SPLIT_REQUEST': True, # Force separates Read/Write schemas
+    # This forces GET requests to use one schema and POST/PUT to use another
+    # (Separating read_only vs write_only fields perfectly)
+    'COMPONENT_SPLIT_REQUEST': True,
+    
     'SECURITY': [{'BearerAuth': []}],
     'APPEND_COMPONENTS': {
         'securitySchemes': {
