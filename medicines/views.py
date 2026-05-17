@@ -14,9 +14,32 @@ from .permissions import (
     IsAdmin, IsPharmacist, IsCashier,
     IsAdminOrPharmacist, IsAdminOrCashier
 )
+from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiExample, OpenApiResponse
 
 # === AUTHENTICATION ===
 
+@extend_schema(
+    tags=['Auth'],
+    request=inline_serializer(
+        name='LoginRequest',
+        fields={
+            'username': serializers.CharField(),
+            'password': serializers.CharField(),
+        }
+    ),
+    responses={
+        200: inline_serializer(
+            name='LoginResponse',
+            fields={
+                'token': serializers.CharField(),
+                'user_id': serializers.IntegerField(),
+                'username': serializers.CharField(),
+            }
+        ),
+        401: OpenApiResponse(description='Invalid Credentials')
+    },
+    auth=None # Explicitly tell Swagger this has no security
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @authentication_classes([])
@@ -188,6 +211,20 @@ class CategoryViewSet(viewsets.ModelViewSet):
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        responses={
+            200: inline_serializer(
+                name='CategoryStockSummary',
+                fields={
+                    'category': serializers.CharField(),
+                    'full_path': serializers.CharField(),
+                    'total_products': serializers.IntegerField(),
+                    'total_stock': serializers.IntegerField(),
+                    'total_value': serializers.DecimalField(),
+                }
+            )
+        }
+    )
     @action(detail=True, methods=['get'])
     def stock_summary(self, request, pk=None):
         """Get stock summary for this category and all descendants"""
@@ -200,6 +237,24 @@ class CategoryViewSet(viewsets.ModelViewSet):
             'total_value': category.get_total_value(),  # Will update below
         })
 
+    @extend_schema(
+        request=inline_serializer(
+            name='BulkMoveRequest',
+            fields={
+                'category_ids': serializers.ListField(child=serializers.IntegerField()),
+                'new_parent_id': serializers.IntegerField(required=False, allow_null=True),
+            }
+        ),
+        responses={
+            200: inline_serializer(
+                name='BulkMoveResponse',
+                fields={
+                    'moved': serializers.ListField(child=serializers.IntegerField()),
+                    'errors': serializers.ListField(child=serializers.DictField()),
+                }
+            )
+        }
+    )
     @action(detail=False, methods=['post'])
     def bulk_move(self, request):
         """
@@ -478,6 +533,15 @@ class SaleViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(sales, many=True)
         return Response(serializer.data)
     
+    @extend_schema(
+        responses=inline_serializer(
+            name='SaleReportResponse',
+            fields={
+                'today': serializers.DictField(),
+                'this_month': serializers.DictField(),
+            }
+        )
+    )
     @action(detail=False, methods=['get'])
     def report(self, request):
         """Get sales summary report"""
@@ -753,6 +817,16 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(movements, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        responses=inline_serializer(
+            name='StockMovementSummaryResponse',
+            fields={
+                'total_in': serializers.IntegerField(),
+                'total_out': serializers.IntegerField(),
+                'net_change': serializers.IntegerField(),
+            }
+        )
+    )
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """Get stock movement summary"""

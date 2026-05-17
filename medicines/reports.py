@@ -7,6 +7,8 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import *
 from django.db.models.functions import TruncDate, TruncMonth
+from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiResponse
+from rest_framework import serializers
 
 
 def safe_int(value, default):
@@ -23,6 +25,15 @@ class ReportViewSet(viewsets.ViewSet):
     # FIX: Reports contain sensitive business data; restrict to authenticated users
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses=inline_serializer(
+            name='SalesSummaryResponse',
+            fields={
+                'summary': serializers.DictField(),
+                'daily_breakdown': serializers.ListField(child=serializers.DictField())
+            }
+        )
+    )
     @action(detail=False, methods=['get'])
     def sales_summary(self, request):
         """
@@ -66,6 +77,14 @@ class ReportViewSet(viewsets.ViewSet):
             'daily_breakdown': list(daily_sales)
         })
 
+    @extend_schema(
+        responses=inline_serializer(
+            name='TopProductsResponse',
+            fields={
+                'top_products': serializers.ListField(child=serializers.DictField())
+            }
+        )
+    )
     @action(detail=False, methods=['get'])
     def top_products(self, request):
         """
@@ -89,6 +108,17 @@ class ReportViewSet(viewsets.ViewSet):
             'top_products': list(top_items)
         })
 
+    @extend_schema(
+        responses=inline_serializer(
+            name='StockAlertsResponse',
+            fields={
+                'low_stock': serializers.ListField(child=serializers.DictField()),
+                'expiring_soon': serializers.ListField(child=serializers.DictField()),
+                'expired': serializers.ListField(child=serializers.DictField()),
+                'thresholds': serializers.DictField(),
+            }
+        )
+    )
     @action(detail=False, methods=['get'])
     def stock_alerts(self, request):
         """
@@ -125,6 +155,15 @@ class ReportViewSet(viewsets.ViewSet):
             }
         })
 
+    @extend_schema(
+        responses=inline_serializer(
+            name='PrescriptionStatsResponse',
+            fields={
+                'status_breakdown': serializers.ListField(child=serializers.DictField()),
+                'recent_pending': serializers.ListField(child=serializers.DictField()),
+            }
+        )
+    )
     @action(detail=False, methods=['get'])
     def prescription_stats(self, request):
         """Prescription workflow statistics."""
@@ -148,6 +187,15 @@ class ReportViewSet(viewsets.ViewSet):
             'recent_pending': list(pending_recent)
         })
 
+    @extend_schema(
+        responses=inline_serializer(
+            name='MonthlyRevenueResponse',
+            fields={
+                'year': serializers.IntegerField(),
+                'monthly_data': serializers.ListField(child=serializers.DictField())
+            }
+        )
+    )    
     @action(detail=False, methods=['get'])
     def monthly_revenue(self, request):
         """
@@ -174,6 +222,15 @@ class ReportViewSet(viewsets.ViewSet):
             'monthly_data': list(monthly)
         })
 
+    @extend_schema(
+        responses=inline_serializer(
+            name='ProductTypeBreakdownResponse',
+            fields={
+                'inventory_by_type': serializers.ListField(child=serializers.DictField()),
+                'sales_by_type': serializers.ListField(child=serializers.DictField()),
+            }
+        )
+    )
     @action(detail=False, methods=['get'])
     def product_type_breakdown(self, request):
         """
