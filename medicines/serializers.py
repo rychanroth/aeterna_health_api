@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import *
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -21,15 +22,17 @@ class ProductTypeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
+    @extend_schema_field(serializers.IntegerField())
     def get_products_count(self, obj):
         return obj.products.count()
     
+    @extend_schema_field(serializers.IntegerField())
     def get_categories_count(self, obj):
         return obj.categories.count()
 class CategorySerializer(serializers.ModelSerializer):
     # Read-only
     full_path = serializers.ReadOnlyField()
-    depth = serializers.ReadOnlyField()
+    depth = serializers.IntegerField(read_only=True)
     parent_name = serializers.ReadOnlyField(source='parent.name')
     product_type = ProductTypeSerializer(read_only=True)
     product_type_name = serializers.ReadOnlyField(source='product_type.name')
@@ -72,10 +75,12 @@ class CategorySerializer(serializers.ModelSerializer):
         children = obj.children.filter(is_active=True)
         return CategorySerializer(children, many=True).data
 
+    @extend_schema_field(serializers.IntegerField())
     def get_products_count(self, obj):
         """Count products including descendants"""
         return obj.get_all_products().count()
 
+    @extend_schema_field(serializers.IntegerField())
     def get_total_stock(self, obj):
         """Total stock including descendants"""
         return obj.get_total_stock()
@@ -134,6 +139,7 @@ class SupplierSerializer(serializers.ModelSerializer):
         model = Supplier
         fields = ['id', 'name', 'phone', 'address', 'is_active', 'products_count', 'created_at']
 
+    @extend_schema_field(serializers.IntegerField())
     def get_products_count(self, obj):
         return obj.products.count()
     
@@ -166,9 +172,9 @@ class ProductSerializer(serializers.ModelSerializer):
         allow_null=True,
         required=False
     )
-    is_expired = serializers.ReadOnlyField()
-    is_low_stock = serializers.ReadOnlyField()
-    effective_requires_prescription = serializers.ReadOnlyField()
+    is_expired = serializers.BooleanField(read_only=True)
+    is_low_stock = serializers.BooleanField(read_only=True)
+    effective_requires_prescription = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Product
@@ -361,12 +367,13 @@ class DoctorSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = []
 
+    @extend_schema_field(serializers.IntegerField())
     def get_prescription_count(self, obj):
         """Count all prescriptions of a doctor"""
         return obj.prescriptions.count()    
     
 class PatientSerializer(serializers.ModelSerializer):
-    age = serializers.ReadOnlyField()
+    age = serializers.IntegerField(read_only=True)
     prescription_count = serializers.SerializerMethodField()
     class Meta:
         model = Patient
@@ -377,10 +384,10 @@ class PatientSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
+    @extend_schema_field(serializers.IntegerField())
     def get_prescription_count(self, obj):
         """Count all prescriptions of the patient"""
         return obj.prescriptions.count()
-
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
@@ -469,8 +476,8 @@ class StockMovementSerializer(serializers.ModelSerializer):
     supplier_name = serializers.ReadOnlyField(source='suppliers.name')
     sale_number = serializers.ReadOnlyField(source='sale.sale_number')
     created_by_name = serializers.SerializerMethodField()
-    is_stock_in = serializers.ReadOnlyField()
-    is_stock_out = serializers.ReadOnlyField()
+    is_stock_in = serializers.BooleanField(read_only=True)
+    is_stock_out = serializers.BooleanField(read_only=True)
     movement_direction = serializers.ReadOnlyField()
     
     product_id = serializers.PrimaryKeyRelatedField(

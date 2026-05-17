@@ -220,7 +220,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
                     'full_path': serializers.CharField(),
                     'total_products': serializers.IntegerField(),
                     'total_stock': serializers.IntegerField(),
-                    'total_value': serializers.DecimalField(),
+                    'total_value': serializers.FloatField(),
                 }
             )
         }
