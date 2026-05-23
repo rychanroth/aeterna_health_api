@@ -20,6 +20,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', include('medicines.template_urls')),
     path('api/', include('medicines.urls')),
 
     # YOUR NEW DOCUMENTATION ROUTES:

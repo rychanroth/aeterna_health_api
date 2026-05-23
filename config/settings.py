@@ -63,7 +63,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -149,6 +149,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Complete API for the Aeterna Health pharmacy management system.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'DEFAULT_GENERATOR_CLASS': 'drf_spectacular.generators.SchemaGenerator',
     
     # This forces GET requests to use one schema and POST/PUT to use another
     # (Separating read_only vs write_only fields perfectly)
