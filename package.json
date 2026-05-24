@@ -1,0 +1,26 @@
+{
+  "name": "aeterna_health_api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npx @tailwindcss/cli -i static/css/input.css -o static/css/output.css --watch",
+    "build": "npx @tailwindcss/cli -i static/css/input.css -o static/css/output.css --minify"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rychanroth/aeterna_health_api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/rychanroth/aeterna_health_api/issues"
+  },
+  "homepage": "https://github.com/rychanroth/aeterna_health_api#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.0"
+  }
+}
