@@ -2,5 +2,6 @@ from django.urls import path
 from .template_views import *
 
 urlpatterns = [
-    path('', home, name='home')
+    path('', home, name='home'),
+    path('login/', login_page, name='template_login'),
 ]
