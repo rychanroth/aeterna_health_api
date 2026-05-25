@@ -42,6 +42,7 @@ class CoreModel(models.Model):
     
 class Supplier(CoreModel):
     name = models.CharField(max_length=150)
+    image = models.ImageField(upload_to='suppliers/', blank=True, null=True)
     phone = models.CharField(max_length=30, blank=True)
     address = models.CharField(max_length=300, blank=True)
 
@@ -55,6 +56,7 @@ class Supplier(CoreModel):
 # ProductType
 class ProductType(CoreModel):
     name = models.CharField(max_length=50, unique=True)
+    image = models.ImageField(upload_to='product_types/', blank=True, null=True)
     description = models.CharField(max_length=200, blank=True)
     requires_expiration = models.BooleanField(
         default=True,
@@ -74,6 +76,7 @@ class ProductType(CoreModel):
     
 class Category(CoreModel):
     name = models.CharField(max_length=200)
+    image = models.ImageField(upload_to='categories/', blank=True, null=True)
     parent = models.ForeignKey(
         'self', # foreign key to ITSELF
         on_delete=models.CASCADE,
@@ -255,6 +258,7 @@ class Product(CoreModel):
             return [cls.DIAPER, cls.WIPES, cls.SACHET, cls.PIECE, cls.PACK]
 
     name = models.CharField(max_length=200)
+    image = models.ImageField(upload_to='products/', blank=True, null=True)
     product_type = models.ForeignKey(
         'ProductType',
         on_delete=models.SET_NULL,
@@ -465,6 +469,7 @@ class SaleItem(CoreModel):
 # === Doctor and Patient ===
 class Doctor(CoreModel):
     name = models.CharField(max_length=150)
+    image = models.ImageField(upload_to='doctors/', blank=True, null=True)
     license_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     phone = models.CharField(max_length=30, blank=True)
     clinic_name = models.CharField(max_length=200, blank=True)
@@ -484,6 +489,7 @@ class Patient(CoreModel):
         OTHER = 'other', 'Other'
 
     name = models.CharField(max_length=150)
+    image = models.ImageField(upload_to='patients/', blank=True, null=True)
     phone = models.CharField(max_length=30, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(
