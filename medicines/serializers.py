@@ -15,7 +15,7 @@ class ProductTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductType
-        fields = ['id', 'name', 'description',
+        fields = ['id', 'name', 'image', 'description',
             'requires_prescription', 'requires_expiration',
             'products_count', 'categories_count',
             'is_active', 'created_at'
@@ -60,7 +60,7 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = [
-            'id', 'name', 'full_path', 'depth',
+            'id', 'name', 'image', 'full_path', 'depth',
             'product_type', 'product_type_id', 'product_type_name',
             'parent', 'parent_name', 'parent_id',
             'children',
@@ -137,7 +137,7 @@ class SupplierSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Supplier
-        fields = ['id', 'name', 'phone', 'address', 'is_active', 'products_count', 'created_at']
+        fields = ['id', 'name', 'image', 'phone', 'address', 'is_active', 'products_count', 'created_at']
 
     @extend_schema_field(serializers.IntegerField())
     def get_products_count(self, obj):
@@ -179,7 +179,7 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 
+            'id', 'name', 'image', 
             'product_type', 'product_type_id', 'base_unit',
             'category', 'category_id',
             'suppliers', 'supplier_ids', 'description',
@@ -361,7 +361,7 @@ class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = [
-            'id', 'name', 'license_number', 'phone',
+            'id', 'name', 'image', 'license_number', 'phone',
             'clinic_name', 'clinic_address',
             'is_active', 'prescription_count', 'created_at'
         ]
@@ -378,7 +378,7 @@ class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = [
-            'id', 'name', 'phone', 'date_of_birth', 'age',
+            'id', 'name', 'image', 'phone', 'date_of_birth', 'age',
             'gender', 'address', 'allergy_notes',
             'is_active', 'prescription_count', 'created_at'
         ]
