@@ -326,5 +326,4 @@ def seed_sales_transaction_data():
 
 
 # Execute the seeding function
-if __name__ == '__main__':
-    seed_sales_transaction_data()
+seed_sales_transaction_data()

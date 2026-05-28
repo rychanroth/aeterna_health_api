@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .api_helper import *
+from .decorators import * 
 
+@login_required_template
 def home(request):
     return render(request, 'home.html')
 
@@ -36,3 +38,21 @@ def login_page(request):
             messages.error(request, 'Invalid username or password')
     
     return render(request, 'login.html')
+
+def logout_view(request):
+    request.session.flush() # use flush, not clear 
+    return redirect('template_login')
+
+# === Categories ===
+@login_required_template
+def categories_list(request):
+    token = request.session.get('token')
+    response = api_call('GET', '/api/categories/', token=token)
+    
+    if response.status_code == 200:
+        categories = response.json()
+    else:
+        categories = []
+        messages.error(request, 'Failed to load categories')
+    
+    return render(request, 'categories.html', {'categories': categories})

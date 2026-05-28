@@ -1,13 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Aeterna Health</title>
+    <title>Home - Aeterna Health</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/output.css' %}">
 </head>
-<body>
-    <h1 class="text-3xl font-bold text-blue-600">Hello from Django Templates!</h1>
-    <p class="text-gray-500 mt-2">If you see blue bold text, Tailwind v4 is working.</p>
-    <p>Role: {{ request.session.role }}</p>
+<body class="bg-gray-100 min-h-screen">
+    <div class="bg-white shadow p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold">Aeterna Health</h1>
+        <div class="flex items-center gap-4">
+            <span class="text-gray-600">{{ request.session.username }} ({{ request.session.role }})</span>
+            <a href="{% url 'template_logout' %}" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                Logout
+            </a>
+        </div>
+    </div>
+    
+    <div class="p-8">
+        <p class="text-gray-500">Dashboard content goes here.</p>
+    </div>
 </body>
 </html>

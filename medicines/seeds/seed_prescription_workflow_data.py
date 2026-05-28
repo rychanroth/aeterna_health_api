@@ -415,6 +415,5 @@ def seed_prescription_workflow_data():
         print("")
 
 
-# Execute the seeding function
-if __name__ == '__main__':
-    seed_prescription_workflow_data()
+
+seed_prescription_workflow_data()

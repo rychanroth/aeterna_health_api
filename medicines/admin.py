@@ -12,25 +12,25 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(ProductType)
 class ProductTypeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'requires_expiration', 'requires_prescription', 'is_active']
+    list_display = ['image', 'name', 'requires_expiration', 'requires_prescription', 'is_active']
     list_filter = ['is_active', 'requires_expiration', 'requires_prescription']
     search_fields = ['name']
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'parent', 'product_type', 'is_active']
+    list_display = ['image', 'name', 'parent', 'product_type', 'is_active']
     list_filter = ['is_active', 'product_type']
     search_fields = ['name']
 
 @admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):
-    list_display = ['name', 'phone', 'is_active']
+    list_display = ['image', 'name', 'phone', 'is_active']
     list_filter = ['is_active']
     search_fields = ['name']
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'selling_price', 'stock_quantity', 'expiration_date', 'is_active']
+    list_display = ['image', 'name', 'category', 'selling_price', 'stock_quantity', 'expiration_date', 'is_active']
     list_filter = ['category', 'is_active', 'requires_prescription', 'product_type']
     search_fields = ['name']
     filter_horizontal = ['suppliers']
@@ -38,13 +38,13 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Doctor)
 class DoctorAdmin(admin.ModelAdmin):
-    list_display = ['name', 'license_number', 'phone', 'clinic_name', 'is_active']
+    list_display = ['image', 'name', 'license_number', 'phone', 'clinic_name', 'is_active']
     list_filter = ['is_active']
     search_fields = ['name', 'license_number']
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ['name', 'phone', 'gender', 'date_of_birth', 'is_active']
+    list_display = ['image', 'name', 'phone', 'gender', 'date_of_birth', 'is_active']
     list_filter = ['is_active', 'gender']
     search_fields = ['name', 'phone']
 
