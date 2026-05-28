@@ -1,57 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends 'base.html' %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeterna - Categories</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/output.css' %}">
-</head>
+{% block title %}Categories - Aeterna Health{% endblock %}
 
-<body class="bg-gray-100 min-h-screen">
+{% block page_title %}Categories{% endblock %}
 
-    <div class="bg-white shadow p-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold">Aeterna Health</h1>
-        <a href="{% url 'template_logout' %}"
-            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</a>
-    </div>
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">Categories List</h2>
 
-    <div class="p-8">
-        <h2 class="text-2xl font-bold mb-4">Categories</h2>
-
-        <table class="w-full bg-white rounded-lg shadow overflow-hidden">
-            <thead class="bg-gray-800 text-white">
-                <tr>
-                    <th class="p-3 text-left">ID</th>
-                    <th class="p-3 text-left">Image</th>
-                    <th class="p-3 text-left">Name</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for category in categories %}
-                <tr class="border-b hover:bg-gray-50">
-                    <td class="p-3">{{ category.id }}</td>
-                    <td class="p-3">
-                        {% if category.image %}
-                        <img src="{{ category.image }}" class="w-10 h-10 object-cover rounded">
-                        {% else %}
-                        <div
-                            class="w-4 h-4 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
-                            No img</div>
-                        {% endif %}
-                    </td>
-                    <td class="p-3">{{ category.name }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="3" class="p-4 text-center text-gray-500">No categories found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-</body>
-
-</html>
+<table class="w-full bg-white rounded-lg shadow overflow-hidden">
+    <thead class="bg-gray-800 text-white">
+        <tr>
+            <th class="p-3 text-left">ID</th>
+            <th class="p-3 text-left">Image</th>
+            <th class="p-3 text-left">Name</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for category in categories %}
+        <tr class="border-b hover:bg-gray-50">
+            <td class="p-3">{{ category.id }}</td>
+            <td class="p-3">
+                {% if category.image %}
+                    <img src="{{ category.image }}" class="w-10 h-10 object-cover rounded">
+                {% else %}
+                    <div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No img</div>
+                {% endif %}
+            </td>
+            <td class="p-3">{{ category.name }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="3" class="p-4 text-center text-gray-500">No categories found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
