@@ -47,12 +47,45 @@ def logout_view(request):
 @login_required_template
 def categories_list(request):
     token = request.session.get('token')
-    response = api_call('GET', '/api/categories/', token=token)
+    
+    # 1. What page is the user asking for? Default to 1
+    current_page = request.GET.get('page', 1)
+    
+    # 2. Ask the API for that page
+    response = api_call('GET', f'/api/categories/?page={current_page}', token=token)
+    
+    # 3. Setup default values
+    categories = []
+    next_page = None
+    prev_page = None
+    count = 0
     
     if response.status_code == 200:
-        categories = response.json()
+        data = response.json()
+        categories = data.get('results', [])
+        count = data.get('count', 0)
+        
+        # 4. FIGURE OUT THE PAGE NUMBERS IN PYTHON
+        # If 'next' exists, it looks like: "http://127.0.0.1:8000/api/categories/?page=3"
+        # We split it by 'page=' and take the last part -> "3"
+        if data.get('next'):
+            next_page = data['next'].split('page=')[-1]
+            
+        if data.get('previous'):
+            # If 'previous' exists but is empty string (API quirk), it means page 1
+            if 'page=' in data['previous']:
+                prev_page = data['previous'].split('page=')[-1]
+            else:
+                prev_page = 1
+                
     else:
-        categories = []
         messages.error(request, 'Failed to load categories')
     
-    return render(request, 'categories.html', {'categories': categories})
+    # 5. Pass SIMPLE variables to the template
+    return render(request, 'categories.html', {
+        'categories': categories,
+        'next_page': next_page,   # Just a number: "2" or None
+        'prev_page': prev_page,   # Just a number: "1" or None
+        'count': count,
+        'current_page': current_page,
+    })
