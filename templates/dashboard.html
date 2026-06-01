@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Aeterna Health{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- SUMMARY CARDS GRID -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    
+    <!-- CARD 1: Low Stock -->
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+        <h3 class="text-sm font-medium text-gray-500">Low Stock Items</h3>
+        <p class="text-3xl font-bold text-gray-800 mt-2">
+            {% if alerts %}{{ alerts.low_stock|length }}{% else %}0{% endif %}
+        </p>
+        <p class="text-xs text-red-500 mt-1">Requires restocking</p>
+    </div>
+
+    <!-- CARD 2: Expiring Soon -->
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
+        <h3 class="text-sm font-medium text-gray-500">Expiring Soon</h3>
+        <p class="text-3xl font-bold text-gray-800 mt-2">
+            {% if alerts %}{{ alerts.expiring_soon|length }}{% else %}0{% endif %}
+        </p>
+        <p class="text-xs text-orange-500 mt-1">Check shelves immediately</p>
+    </div>
+
+    <!-- CARD 3: Pending Prescriptions -->
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+        <h3 class="text-sm font-medium text-gray-500">Pending Prescriptions</h3>
+        <p class="text-3xl font-bold text-gray-800 mt-2">
+            {% if rx_stats %}
+                {% for stat in rx_stats.status_breakdown %}
+                    {% if stat.status == 'pending' %}{{ stat.count }}{% endif %}
+                {% endfor %}
+            {% else %}0{% endif %}
+        </p>
+        <p class="text-xs text-blue-500 mt-1">Awaiting verification</p>
+    </div>
+
+    <!-- CARD 4: Total Revenue (Admin Only) -->
+    {% if role == 'admin' %}
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-teal-500">
+        <h3 class="text-sm font-medium text-gray-500">Total Revenue</h3>
+        <p class="text-3xl font-bold text-gray-800 mt-2">
+            ${% if sales %}{{ sales.summary.total_revenue|floatformat:2 }}{% else %}0.00{% endif %}
+        </p>
+        <p class="text-xs text-teal-500 mt-1">{{ sales.summary.total_sales|default:"0" }} total sales</p>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- DETAILED LISTS GRID -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    
+    <!-- TABLE 1: Low Stock Items -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="p-4 border-b border-gray-100 bg-gray-50">
+            <h3 class="font-semibold text-gray-800">⚠️ Low Stock Items</h3>
+        </div>
+        <table class="w-full">
+            <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                <tr>
+                    <th class="p-3 text-left">Product</th>
+                    <th class="p-3 text-left">Type</th>
+                    <th class="p-3 text-left">Stock</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-sm">
+                {% if alerts %}
+                    {% for item in alerts.low_stock %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 font-medium text-gray-900">{{ item.name }}</td>
+                        <td class="p-3 text-gray-500">{{ item.product_type__name }}</td>
+                        <td class="p-3">
+                            <span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-bold">
+                                {{ item.stock_quantity }} {{ item.base_unit }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="p-4 text-center text-gray-400">All stock levels are healthy!</td></tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TABLE 2: Pending Prescriptions -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="p-4 border-b border-gray-100 bg-gray-50">
+            <h3 class="font-semibold text-gray-800">📋 Pending Prescriptions</h3>
+        </div>
+        <table class="w-full">
+            <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                <tr>
+                    <th class="p-3 text-left">Rx Number</th>
+                    <th class="p-3 text-left">Patient</th>
+                    <th class="p-3 text-left">Doctor</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-sm">
+                {% if rx_stats %}
+                    {% for rx in rx_stats.recent_pending %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 font-mono text-teal-700 font-medium">{{ rx.prescription_number }}</td>
+                        <td class="p-3 text-gray-900">{{ rx.patient__name }}</td>
+                        <td class="p-3 text-gray-500">{{ rx.doctor__name }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="p-4 text-center text-gray-400">No pending prescriptions!</td></tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
