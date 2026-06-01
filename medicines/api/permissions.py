@@ -8,7 +8,7 @@ Role Hierarchy:
 - CASHIER: Sales, Products (read-only)
 
 Usage in views:
-    from .permissions import IsAdmin, IsPharmacist, IsCashier, IsAdminOrPharmacist
+    from medicines.core.permissoins import IsAdmin, IsPharmacist, IsCashier, IsAdminOrPharmacist
 
     class ProductViewSet(viewsets.ModelViewSet):
         def get_permissions(self):

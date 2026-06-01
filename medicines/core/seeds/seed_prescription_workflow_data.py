@@ -20,7 +20,7 @@ from datetime import date, timedelta
 from django.utils import timezone
 from decimal import Decimal
 
-from medicines.models import (
+from medicines.core.models import (
     User, Supplier, ProductType, Category, Product,
     Doctor, Patient, Prescription, PrescriptionItem,
     Sale, SaleItem, StockMovement

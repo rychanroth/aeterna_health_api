@@ -25,7 +25,7 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 
-from medicines.models import (
+from medicines.core.models import (
     ProductType, Category, Supplier, Product,
     Sale, SaleItem, StockMovement
 )

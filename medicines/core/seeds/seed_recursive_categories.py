@@ -1,4 +1,4 @@
-from medicines.models import ProductType, Category, Supplier, Product, StockMovement
+from medicines.core.models import ProductType, Category, Supplier, Product, StockMovement
 from decimal import Decimal
 from datetime import date, timedelta
 

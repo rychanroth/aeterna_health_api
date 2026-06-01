@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .api_helper import *
-from .decorators import * 
+from medicines.web.api_helper import *
+from medicines.web.decorators import * 
 
 @login_required_template
 def home(request):

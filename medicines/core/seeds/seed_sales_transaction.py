@@ -17,7 +17,7 @@ from decimal import Decimal
 from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 
-from medicines.models import (
+from medicines.core.models import (
     ProductType, Category, Supplier, Product,
     Doctor, Patient, Prescription, PrescriptionItem,
     Sale, SaleItem, StockMovement

@@ -1,7 +1,7 @@
 from . import views
 from rest_framework.routers import DefaultRouter
 from django.urls import path
-from . import reports
+from medicines.api import reports
 
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet, basename='user')

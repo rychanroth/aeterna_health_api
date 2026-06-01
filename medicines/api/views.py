@@ -1,7 +1,7 @@
 from datetime import timedelta
 from django.utils import timezone
-from .models import *
-from .serializers import *
+from medicines.core.models import *
+from medicines.api.serializers import *
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
@@ -10,7 +10,7 @@ from rest_framework.permissions import *
 from django.contrib.auth import authenticate
 from django.db import models
 from django.db.models import Q
-from .permissions import (
+from medicines.api.permissions import (
     IsAdmin, IsPharmacist, IsCashier,
     IsAdminOrPharmacist, IsAdminOrCashier
 )

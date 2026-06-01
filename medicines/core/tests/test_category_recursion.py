@@ -17,7 +17,7 @@ from django.db import IntegrityError
 from decimal import Decimal
 from datetime import date, timedelta
 
-from medicines.models import User, ProductType, Category, Product
+from medicines.core.models import User, ProductType, Category, Product
 
 
 class CategoryAPIAndRecursionEdgeCaseTestCase(APITestCase):

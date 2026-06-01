@@ -32,7 +32,9 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     'jazzmin',
-    'medicines',
+    'medicines.core', # Must be first so models are loaded before API/Web try to use them
+    'medicines.api',
+    'medicines.web',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
