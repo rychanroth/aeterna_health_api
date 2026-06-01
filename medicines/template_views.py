@@ -82,10 +82,54 @@ def categories_list(request):
         messages.error(request, 'Failed to load categories')
     
     # 5. Pass SIMPLE variables to the template
-    return render(request, 'categories.html', {
+    return render(request, 'categories/categories.html', {
         'categories': categories,
         'next_page': next_page,   # Just a number: "2" or None
         'prev_page': prev_page,   # Just a number: "1" or None
         'count': count,
         'current_page': current_page,
+    })
+
+@login_required_template
+def category_detail(request, id):
+    token = request.session.get('token')
+    
+    # 1. Fetch the single category
+    cat_response = api_call('GET', f'/api/categories/{id}/', token=token)
+    
+    if cat_response.status_code != 200:
+        messages.error(request, 'Category not found')
+        return redirect('template_categories')
+        
+    category = cat_response.json()
+    
+    # 2. Fetch products in this category (with pagination)
+    page = request.GET.get('page', 1)
+    prod_response = api_call('GET', f'/api/categories/{id}/products/?page={page}', token=token)
+    
+    products = []
+    next_page = None
+    prev_page = None
+    count = 0
+    
+    if prod_response.status_code == 200:
+        data = prod_response.json()
+        products = data.get('results', [])
+        count = data.get('count', 0)
+        
+        if data.get('next'):
+            next_page = data['next'].split('page=')[-1]
+        if data.get('previous'):
+            if 'page=' in data['previous']:
+                prev_page = data['previous'].split('page=')[-1]
+            else:
+                prev_page = 1
+                
+    return render(request, 'categories/category_detail.html', {
+        'category': category,
+        'products': products,
+        'next_page': next_page,
+        'prev_page': prev_page,
+        'count': count,
+        'current_page': page,
     })

@@ -26,12 +26,18 @@
                     {% if category.image %}
                     <img src="{{ category.image }}" class="w-10 h-10 object-cover rounded border bg-gray-50">
                     {% else %}
-                    <div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs border border-dashed">
+                    <div
+                        class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs border border-dashed">
                         No img
                     </div>
                     {% endif %}
                 </td>
-                <td class="p-3 text-sm font-medium text-gray-900">{{ category.name }}</td>
+                <td class="p-3 text-sm font-medium text-gray-900">
+                    <a href="{% url 'template_category_detail' category.id %}"
+                        class="text-teal-700 hover:text-teal-900 hover:underline">
+                        {{ category.name }}
+                    </a>
+                </td>
             </tr>
             {% empty %}
             <tr>
@@ -44,9 +50,10 @@
     </table>
 
     <div class="bg-white px-4 py-4 flex items-center justify-between border-t border-gray-100">
-        
+
         {% if prev_page %}
-        <a href="?page={{ prev_page }}" class="inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
+        <a href="?page={{ prev_page }}"
+            class="inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
             &larr; Previous
         </a>
         {% else %}
@@ -60,7 +67,8 @@
         </span>
 
         {% if next_page %}
-        <a href="?page={{ next_page }}" class="inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
+        <a href="?page={{ next_page }}"
+            class="inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
             Next &rarr;
         </a>
         {% else %}

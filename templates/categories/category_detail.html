@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ category.name }} - Aeterna Health{% endblock %}
+
+{% block page_title %}{{ category.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'template_categories' %}" class="text-teal-600 hover:underline text-sm">&larr; Back to Categories</a>
+</div>
+
+<div class="bg-white rounded-lg shadow p-6 mb-8 flex items-center gap-6">
+    {% if category.image %}
+        <img src="{{ category.image }}" class="w-24 h-24 object-cover rounded-lg border">
+    {% else %}
+        <div class="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 border-2 border-dashed">
+            No img
+        </div>
+    {% endif %}
+    <div>
+        <h2 class="text-2xl font-bold text-gray-800">{{ category.name }}</h2>
+        <p class="text-gray-500 text-sm mt-1">Category ID: {{ category.id }}</p>
+    </div>
+</div>
+
+<h3 class="text-lg font-semibold mb-3">Products ({{ count }})</h3>
+
+<table class="w-full bg-white rounded-lg shadow overflow-hidden">
+    <thead class="bg-gray-800 text-white">
+        <tr>
+            <th class="p-3 text-left text-sm">ID</th>
+            <th class="p-3 text-left text-sm">Image</th>
+            <th class="p-3 text-left text-sm">Name</th>
+            <th class="p-3 text-left text-sm">Price</th>
+        </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+        {% for product in products %}
+        <tr class="hover:bg-gray-50 transition-colors">
+            <td class="p-3 text-sm text-gray-600">{{ product.id }}</td>
+            <td class="p-3">
+                {% if product.image %}
+                    <img src="{{ product.image }}" class="w-10 h-10 object-cover rounded border">
+                {% else %}
+                    <div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs border border-dashed">No img</div>
+                {% endif %}
+            </td>
+            <td class="p-3 text-sm font-medium text-gray-900">{{ product.name }}</td>
+            <td class="p-3 text-sm text-gray-600">{{ product.selling_price }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" class="p-8 text-center text-gray-400 text-sm">No products in this category.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Pagination (Same pattern as categories) -->
+<div class="mt-6 flex items-center justify-between">
+    {% if prev_page %}
+        <a href="?page={{ prev_page }}" class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700">&larr; Previous</a>
+    {% else %}
+        <span class="bg-gray-100 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium border">Previous</span>
+    {% endif %}
+
+    <span class="text-sm text-gray-500">Page {{ current_page }}</span>
+
+    {% if next_page %}
+        <a href="?page={{ next_page }}" class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700">Next &rarr;</a>
+    {% else %}
+        <span class="bg-gray-100 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium border">Next</span>
+    {% endif %}
+</div>
+{% endblock %}
