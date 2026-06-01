@@ -51,8 +51,13 @@ def categories_list(request):
     # 1. What page is the user asking for? Default to 1
     current_page = request.GET.get('page', 1)
     
+    # NEW: Capture the search term (default to empty string)
+    search_query = request.GET.get('search', '')
+
     # 2. Ask the API for that page
-    response = api_call('GET', f'/api/categories/?page={current_page}', token=token)
+    # NEW: Append ?search= to the API call
+    api_url = f'/api/categories/?page={current_page}&search={search_query}'
+    response = api_call('GET', api_url, token=token)
     
     # 3. Setup default values
     categories = []

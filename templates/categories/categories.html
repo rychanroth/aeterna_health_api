@@ -7,7 +7,20 @@
 {% block content %}
 <div class="bg-white rounded-lg shadow overflow-hidden">
     <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-        <h2 class="text-xl font-bold text-gray-800">Categories List</h2>
+        <div class="flex items-center gap-4">
+            <h2 class="text-xl font-bold text-gray-800">Categories</h2>
+
+            <!-- SEARCH FORM -->
+            <form method="GET" action="" class="flex">
+                <input type="text" name="search" placeholder="Search categories..." value="{{ request.GET.search }}"
+                    class="border border-gray-300 rounded-l-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 w-48">
+                <button type="submit"
+                    class="bg-gray-200 border border-l-0 border-gray-300 rounded-r-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-300">
+                    Search
+                </button>
+            </form>
+        </div>
+
         <a href="{% url 'template_category_create' %}"
             class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
             + Add Category
