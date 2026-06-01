@@ -15,9 +15,15 @@
                 <input type="text" name="search" placeholder="Search categories..." value="{{ request.GET.search }}"
                     class="border border-gray-300 rounded-l-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 w-48">
                 <button type="submit"
-                    class="bg-gray-200 border border-l-0 border-gray-300 rounded-r-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-300">
+                    class="bg-gray-200 border border-l-0 border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-300">
                     Search
                 </button>
+                <!-- ADD THIS CLEAR BUTTON -->
+                {% if request.GET.search %}
+                <a href="{% url 'template_categories' %}" class="ml-2 text-sm text-red-500 hover:text-red-700">
+                    Clear
+                </a>
+                {% endif %}
             </form>
         </div>
 
@@ -70,8 +76,15 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="3" class="p-8 text-center text-gray-400 text-sm">
+                <td colspan="4" class="p-8 text-center text-gray-400 text-sm">
+                    {% if request.GET.search %}
+                    No categories found for "<strong>{{ request.GET.search }}</strong>".
+                    <a href="{% url 'template_categories' %}" class="text-teal-600 underline">Clear search</a>
+                    {% else %}
                     No categories found.
+                    <a href="{% url 'template_category_create' %}" class="text-teal-600 underline">Add the first
+                        one!</a>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
