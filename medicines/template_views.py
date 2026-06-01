@@ -102,6 +102,12 @@ def category_detail(request, id):
         return redirect('template_categories')
         
     category = cat_response.json()
+
+    # 2. Fetch descendant (children) categories
+    desc_response = api_call('GET', f'/api/categories/{id}/descendants/', token=token)
+    descendants = []
+    if desc_response.status_code == 200:
+        descendants = desc_response.json()
     
     # 2. Fetch products in this category (with pagination)
     page = request.GET.get('page', 1)
@@ -127,6 +133,7 @@ def category_detail(request, id):
                 
     return render(request, 'categories/category_detail.html', {
         'category': category,
+        'descendants': descendants,
         'products': products,
         'next_page': next_page,
         'prev_page': prev_page,
