@@ -32,15 +32,31 @@ class User(AbstractUser):
         return self.role == self.Role.CASHIER
 
 
-class CoreModel(models.Model):
+from django.db import models
+
+class CoreAbstractModel(models.Model):
+    """
+    The absolute base record. Inherited by EVERY single entity 
+    including ledger records (Sales, StockMovements).
+    """
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+
+
+class UpdatableAbstractModel(CoreAbstractModel):
+    """
+    Inherits is_active and created_at, but adds tracking for updates.
+    Inherited by entities that change over time (Products, Categories, Suppliers).
+    """
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         abstract = True
     
-class Supplier(CoreModel):
+class Supplier(UpdatableAbstractModel):
     name = models.CharField(max_length=150)
     image = models.ImageField(upload_to='suppliers/', blank=True, null=True)
     phone = models.CharField(max_length=30, blank=True)
@@ -54,7 +70,7 @@ class Supplier(CoreModel):
         return self.name
 
 # ProductType
-class ProductType(CoreModel):
+class ProductType(UpdatableAbstractModel):
     name = models.CharField(max_length=50, unique=True)
     image = models.ImageField(upload_to='product_types/', blank=True, null=True)
     description = models.CharField(max_length=200, blank=True)
@@ -74,7 +90,7 @@ class ProductType(CoreModel):
     def __str__(self):
         return self.name
     
-class Category(CoreModel):
+class Category(UpdatableAbstractModel):
     name = models.CharField(max_length=200)
     image = models.ImageField(upload_to='categories/', blank=True, null=True)
     parent = models.ForeignKey(
@@ -208,7 +224,7 @@ class Category(CoreModel):
         )['total'] or 0
 
     
-class Product(CoreModel):
+class Product(UpdatableAbstractModel):
     class BaseUnit(models.TextChoices):
         # Medicine - Oral
         TABLET = 'tablet', 'Tablet'
@@ -339,7 +355,7 @@ class Product(CoreModel):
         super().save(*args, **kwargs)
 
 
-class Sale(CoreModel):
+class Sale(CoreAbstractModel):
     class PaymentMethod(models.TextChoices):
         CASH = 'cash', 'Cash'
         CARD = 'card', 'Card'
@@ -383,7 +399,7 @@ class Sale(CoreModel):
             self.sale_number = f"SL-{today.strftime('%Y%m%d')}-{count:04d}"
         super().save(*args, **kwargs)
     
-class SaleItem(CoreModel):
+class SaleItem(CoreAbstractModel):
     sale = models.ForeignKey(
         'Sale', 
         on_delete=models.CASCADE,
@@ -467,7 +483,7 @@ class SaleItem(CoreModel):
         return f"{self.sale.sale_number} - {self.product}"
 
 # === Doctor and Patient ===
-class Doctor(CoreModel):
+class Doctor(UpdatableAbstractModel):
     name = models.CharField(max_length=150)
     image = models.ImageField(upload_to='doctors/', blank=True, null=True)
     license_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
@@ -482,7 +498,7 @@ class Doctor(CoreModel):
     def __str__(self):
         return self.name
     
-class Patient(CoreModel):
+class Patient(UpdatableAbstractModel):
     class Gender(models.TextChoices):
         MALE = 'male', 'Male'
         FEMALE = 'female', 'Female'
@@ -516,7 +532,7 @@ class Patient(CoreModel):
             return today.year - self.date_of_birth.year  - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
         return None
 
-class Prescription(CoreModel):
+class Prescription(UpdatableAbstractModel):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
         VERIFIED = 'verified', 'Verified'
@@ -569,7 +585,7 @@ class Prescription(CoreModel):
     def __str__(self):
         return self.prescription_number
     
-class PrescriptionItem(CoreModel):
+class PrescriptionItem(UpdatableAbstractModel):
     prescription = models.ForeignKey(
         'Prescription',
         on_delete=models.CASCADE,
@@ -593,7 +609,7 @@ class PrescriptionItem(CoreModel):
         return f"{self.prescription.prescription_number} - {product_name}"
     
 # === STOCK MOVEMENT ===
-class StockMovement(CoreModel):
+class StockMovement(CoreAbstractModel):
     class Type(models.TextChoices):
         IN = 'in', 'Stock In'
         OUT  = 'out', 'Stock Out'
