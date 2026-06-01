@@ -20,6 +20,7 @@
                 <th class="p-3 text-left text-sm font-semibold">ID</th>
                 <th class="p-3 text-left text-sm font-semibold">Image</th>
                 <th class="p-3 text-left text-sm font-semibold">Name</th>
+                <th class="p-3 text-left text-sm font-semibold">Actions</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -41,6 +42,17 @@
                         class="text-teal-700 hover:text-teal-900 hover:underline">
                         {{ category.name }}
                     </a>
+                </td>
+                <td class="p-3 text-sm space-x-2">
+                    <a href="{% url 'template_category_edit' category.id %}"
+                        class="text-teal-600 hover:text-teal-800 font-medium">Edit</a>
+
+                    <form method="POST" action="{% url 'template_category_delete' category.id %}" class="inline"
+                        onsubmit="return confirm('Delete this category? This cannot be undone.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
+                    </form>
                 </td>
             </tr>
             {% empty %}

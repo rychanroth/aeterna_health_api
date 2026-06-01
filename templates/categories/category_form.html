@@ -28,23 +28,37 @@
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
-            <input type="text" name="name" required
+            <input type="text" name="name" required value="{% if edit_mode %}{{ category.name }}{% endif %}"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
         </div>
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Image</label>
+
+            <!-- Show current image if editing -->
+            {% if edit_mode and category.image %}
+            <div class="mb-2">
+                <p class="text-xs text-gray-500 mb-1">Current image:</p>
+                <img src="{{ category.image }}" class="w-20 h-20 object-cover rounded border">
+            </div>
+            <p class="text-xs text-gray-400 mb-2">Leave blank to keep current image.</p>
+            {% endif %}
+
             <input type="file" name="image" accept="image/*"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
         </div>
 
         <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Product Type <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Product Type <span
+                    class="text-red-500">*</span></label>
             <select name="product_type_id" required
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
                 <option value="">-- Select Product Type --</option>
                 {% for pt in product_types %}
-                <option value="{{ pt.id }}">{{ pt.name }}</option>
+                <!-- Check if this pt.id matches the category's current product_type id -->
+                <option value="{{ pt.id }}" {% if edit_mode and pt.id == category.product_type.id %}selected{% endif %}>
+                    {{ pt.name }}
+                </option>
                 {% endfor %}
             </select>
         </div>

@@ -180,3 +180,64 @@ def category_create(request):
         'errors': errors,
         'product_types': product_types,
     })
+
+@login_required_template
+def category_edit(request, id):
+    token = request.session.get('token')
+    errors = {}
+    
+    # 1. Fetch the existing category to pre-populate the form
+    cat_response = api_call('GET', f'/api/categories/{id}/', token=token)
+    if cat_response.status_code != 200:
+        messages.error(request, 'Category not found')
+        return redirect('template_categories')
+    category = cat_response.json()
+    
+    # 2. Handle form submission
+    if request.method == 'POST':
+        data = {
+            'name': request.POST.get('name'),
+            'product_type_id': request.POST.get('product_type_id'),
+        }
+        
+        parent_id = request.POST.get('parent')
+        if parent_id:
+            data['parent'] = parent_id
+            
+        files = None
+        if 'image' in request.FILES:
+            files = {'image': request.FILES['image']}
+            
+        # 3. USE PATCH (not POST). PATCH only updates the fields you send.
+        response = api_call('PATCH', f'/api/categories/{id}/', data=data, token=token, files=files)
+        
+        if response.status_code == 200:
+            messages.success(request, 'Category updated successfully!')
+            return redirect('template_categories')
+        else:
+            errors = response.json()
+            
+    # Fetch product types for dropdown
+    pt_response = api_call('GET', '/api/product-types/', token=token)
+    product_types = pt_response.json().get('results', []) if pt_response.status_code == 200 else []
+    
+    return render(request, 'categories/category_form.html', {
+        'edit_mode': True,
+        'category': category,
+        'errors': errors,
+        'product_types': product_types,
+    })
+
+@login_required_template
+def category_delete(request, id):
+    # Only process if it's our special POST disguised as DELETE
+    if request.method == 'POST' and request.POST.get('_method') == 'DELETE':
+        token = request.session.get('token')
+        response = api_call('DELETE', f'/api/categories/{id}/', token=token)
+        
+        if response.status_code == 204:
+            messages.success(request, 'Category deleted.')
+        else:
+            messages.error(request, 'Failed to delete category.')
+            
+    return redirect('template_categories')
