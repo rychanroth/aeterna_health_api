@@ -14,6 +14,7 @@ from medicines.api.permissions import (
     IsAdmin, IsPharmacist, IsCashier,
     IsAdminOrPharmacist, IsAdminOrCashier
 )
+from rest_framework import serializers
 from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiExample, OpenApiResponse
 
 # === AUTHENTICATION ===
