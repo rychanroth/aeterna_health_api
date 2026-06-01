@@ -141,6 +141,7 @@ class ProductTypeViewSet(viewsets.ModelViewSet):
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    search_fields = ['name', 'product_type__name']
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'roots', 'products', 'tree', 'descendants', 'ancestors']:
