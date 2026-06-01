@@ -91,6 +91,11 @@ def categories_list(request):
     })
 
 @login_required_template
+def category_create(request):
+    # For now, just show the form
+    return render(request, 'categories/category_form.html', {'edit_mode': False})
+
+@login_required_template
 def category_detail(request, id):
     token = request.session.get('token')
     
@@ -140,3 +145,4 @@ def category_detail(request, id):
         'count': count,
         'current_page': page,
     })
+    

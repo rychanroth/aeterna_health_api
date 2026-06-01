@@ -8,6 +8,7 @@ urlpatterns = [
     path('login/', login_page, name='template_login'),
     path('logout/', logout_view, name='template_logout'),
     path('categories/', categories_list, name='template_categories'),
+    path('categories/create/', category_create, name='template_category_create'),
     path('categories/<int:id>/', category_detail, name='template_category_detail'),
 ]
 

@@ -6,8 +6,12 @@
 
 {% block content %}
 <div class="bg-white rounded-lg shadow overflow-hidden">
-    <div class="p-4 border-b border-gray-100 bg-gray-50">
+    <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
         <h2 class="text-xl font-bold text-gray-800">Categories List</h2>
+        <a href="{% url 'template_category_create' %}"
+            class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
+            + Add Category
+        </a>
     </div>
 
     <table class="w-full">
