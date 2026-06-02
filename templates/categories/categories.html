@@ -21,7 +21,7 @@
     </a>
 </div>
 <!-- Search & Filter Bar -->
-<form method="get" action="{% url 'template-categories' %}"
+<form method="get" action="{% url 'template-category-list' %}"
     class="mb-6 bg-white p-4 rounded shadow flex gap-4 items-end">
     <!-- Search Input -->
     <div class="flex-1">
@@ -45,7 +45,7 @@
     </div>
     <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 h-10">Apply</button>
     {% if search_query or ordering %}
-    <a href="{% url 'template-categories' %}" class="text-red-600 text-sm hover:underline h-10 flex items-center">Clear
+    <a href="{% url 'template-category-list' %}" class="text-red-600 text-sm hover:underline h-10 flex items-center">Clear
         Filters</a>
     {% endif %}
 </form>
