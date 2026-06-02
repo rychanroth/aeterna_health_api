@@ -107,54 +107,49 @@ def category_create(request):
         'category': old_input or {}, # <--- PASS IT AS CATEGORY CONTEXT
     })
 
-# === Category Detail (GET) ===
+# === Category Detail (Updated) ===
 @login_required_template
 def category_detail(request, id):
     token = request.session.get('token')
     
-    # 1. Fetch the single category
     cat_response = api_call('GET', f'/api/categories/{id}/', token=token)
-    
-    if cat_response.status_code == 404:
+    if cat_response.status_code != 200:
         messages.error(request, 'Category not found.')
         return redirect('template_categories')
-    if cat_response.status_code != 200:
-        messages.error(request, 'Failed to load category details.')
-        return redirect('template_categories')
-        
     category = cat_response.json()
 
-    # 2. Fetch descendant categories (assuming API returns a flat list ordered by tree)
+    # Fetch Ancestors (for Breadcrumbs)
+    anc_response = api_call('GET', f'/api/categories/{id}/ancestors/', token=token)
+    ancestors = anc_response.json() if anc_response.status_code == 200 else []
+
+    # Fetch Descendants
     desc_response = api_call('GET', f'/api/categories/{id}/descendants/', token=token)
     descendants = desc_response.json() if desc_response.status_code == 200 else []
 
-    # 3. Fetch products in this category (paginated)
+    # Fetch Stock Summary
+    stock_response = api_call('GET', f'/api/categories/{id}/stock_summary/', token=token)
+    stock_summary = stock_response.json() if stock_response.status_code == 200 else None
+
+    # Fetch Products (Paginated)
     page = request.GET.get('page', 1)
     prod_response = api_call('GET', f'/api/categories/{id}/products/?page={page}', token=token)
-
     products = []
-    next_page = None
-    prev_page = None
+    next_page = prev_page = None
     count = 0
-
     if prod_response.status_code == 200:
         data = prod_response.json()
         products = data.get('results', [])
         count = data.get('count', 0)
-
-        if data.get('next'):
-            next_page = data['next'].split('page=')[-1]
-        if data.get('previous'):
-            prev_page = 1 if 'page=' not in data['previous'] else data['previous'].split('page=')[-1]
+        if data.get('next'): next_page = data['next'].split('page=')[-1]
+        if data.get('previous'): prev_page = 1 if 'page=' not in data['previous'] else data['previous'].split('page=')[-1]
 
     return render(request, 'categories/category_detail.html', {
         'category': category,
+        'ancestors': ancestors,
         'descendants': descendants,
+        'stock_summary': stock_summary,
         'products': products,
-        'next_page': next_page,
-        'prev_page': prev_page,
-        'count': count,
-        'current_page': page,
+        'next_page': next_page, 'prev_page': prev_page, 'count': count, 'current_page': page,
     })
 
 
@@ -236,3 +231,58 @@ def category_delete(request, id):
             messages.error(request, 'Failed to delete category. Ensure it has no child categories or products.')
 
     return redirect('template_categories')
+
+
+# === Category Tree View ===
+@login_required_template
+def category_tree(request):
+    token = request.session.get('token')
+    response = api_call('GET', '/api/categories/tree/', token=token)
+    tree_data = response.json() if response.status_code == 200 else []
+    return render(request, 'categories/category_tree.html', {'tree_data': tree_data})
+
+# === Category Roots View ===
+@login_required_template
+def category_roots(request):
+    token = request.session.get('token')
+    response = api_call('GET', '/api/categories/roots/', token=token)
+    roots = response.json() if response.status_code == 200 else []
+    # Note: API might return paginated results for roots. If so, handle page logic here.
+    return render(request, 'categories/category_roots.html', {'roots': roots})
+
+# === Category Bulk Move ===
+@login_required_template
+def category_bulk_move(request):
+    token = request.session.get('token')
+    errors = {}
+
+    if request.method == 'POST':
+        # Extract list of IDs from checked checkboxes
+        category_ids = request.POST.getlist('category_ids')
+        new_parent_id = request.POST.get('new_parent_id') or None
+
+        if not category_ids:
+            messages.error(request, "Please select at least one category to move.")
+        else:
+            payload = {
+                "category_ids": [int(cid) for cid in category_ids],
+                "new_parent_id": int(new_parent_id) if new_parent_id else None
+            }
+            response = api_call('POST', '/api/categories/bulk_move/', data=payload, token=token)
+            
+            if response.status_code == 200:
+                data = response.json()
+                moved_count = len(data.get('moved', []))
+                messages.success(request, f'Successfully moved {moved_count} categories.')
+                return redirect('template_categories')
+            else:
+                messages.error(request, 'Failed to move categories.')
+
+    # Fetch all categories for the selection list and parent dropdown
+    cat_response = api_call('GET', '/api/categories/?page_size=100', token=token)
+    categories = cat_response.json().get('results', []) if cat_response.status_code == 200 else []
+
+    return render(request, 'categories/category_bulk_move.html', {
+        'categories': categories,
+        'errors': errors
+    })
