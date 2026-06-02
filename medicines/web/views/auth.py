@@ -37,4 +37,4 @@ def login_page(request):
 
 def logout_view(request):
     request.session.flush() # use flush, not clear 
-    return redirect('template_login')
+    return redirect('template-login')

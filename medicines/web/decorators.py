@@ -10,7 +10,7 @@ def login_required_template(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if 'token' not in request.session:
-            return redirect('template_login')
+            return redirect('template-login')
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -23,7 +23,7 @@ def role_required(allowed_roles):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             if 'token' not in request.session:
-                return redirect('template_login')
+                return redirect('template-login')
             
             user_role = request.session.get('role')
             if user_role not in allowed_roles:

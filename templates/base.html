@@ -35,7 +35,7 @@
             -->
 
             <div class="text-xs text-gray-400 uppercase mt-4 mb-2">Inventory</div>
-            <a href="{% url 'template_categories' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Categories</a>
+            <a href="{% url 'template-categories' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Categories</a>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Products</a>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Expired Meds</a>
             
@@ -57,7 +57,7 @@
             <h1 class="text-lg font-semibold">{% block page_title %}Page{% endblock %}</h1>
             <div class="flex items-center gap-4">
                 <span class="text-gray-600 text-sm">{{ request.session.username }} ({{ request.session.role }})</span>
-                <a href="{% url 'template_logout' %}"
+                <a href="{% url 'template-logout' %}"
                     class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Logout</a>
             </div>
         </header>

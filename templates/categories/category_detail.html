@@ -5,16 +5,27 @@
 {% block page_title %}Category Details{% endblock %}
 
 {% block content %}
+<!-- Breadcrumbs (Ancestors) -->
+<div class="mb-4 text-sm text-gray-600 flex items-center gap-2">
+    <a href="{% url 'template-categories' %}" class="hover:underline text-green-600">Categories</a>
+    {% for anc in ancestors %}
+        <i class='bx bx-chevron-right'></i>
+        <a href="{% url 'template-category-detail' anc.id %}" class="hover:underline text-green-600">{{ anc.name }}</a>
+    {% endfor %}
+    <i class='bx bx-chevron-right'></i>
+    <span class="font-semibold text-gray-800">{{ category.name }}</span>
+</div>
+
 <div class="flex justify-between items-center mb-6">
     <div>
-        <a href="{% url 'template_categories' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Categories</a>
+        <a href="{% url 'template-categories' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Categories</a>
         <h2 class="text-2xl font-bold text-gray-800 mt-1">{{ category.name }}</h2>
         <p class="text-sm text-gray-500">Path: {{ category.full_path }} (Depth: {{ category.depth }})</p>
     </div>
     <div class="flex items-center gap-3">
-        <a href="{% url 'template_category_edit' category.id %}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow text-sm">Edit</a>
+        <a href="{% url 'template-category-edit' category.id %}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow text-sm">Edit</a>
         <!-- Delete Form -->
-        <form method="POST" action="{% url 'template_category_delete' category.id %}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
+        <form method="POST" action="{% url 'template-category-delete' category.id %}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
             {% csrf_token %}
             <input type="hidden" name="_method" value="DELETE">
             <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow text-sm">Delete</button>
@@ -49,7 +60,7 @@
             <li class="border p-3 rounded hover:bg-gray-50 flex items-center justify-between">
                 <div>
                     <span style="margin-left: {{ desc.depth|default:'0' }}em;" class="text-gray-400">└</span>
-                    <a href="{% url 'template_category_detail' desc.id %}" class="text-blue-600 hover:underline font-medium">{{ desc.name }}</a>
+                    <a href="{% url 'template-category-detail' desc.id %}" class="text-blue-600 hover:underline font-medium">{{ desc.name }}</a>
                 </div>
                 <span class="text-xs text-gray-500">Depth: {{ desc.depth }}</span>
             </li>
@@ -60,6 +71,24 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Stock Summary Card -->
+{% if stock_summary %}
+<div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6 grid grid-cols-3 gap-4">
+    <div class="text-center">
+        <p class="text-xs text-blue-600 uppercase font-bold">Total Products</p>
+        <p class="text-2xl font-bold text-blue-800">{{ stock_summary.total_products }}</p>
+    </div>
+    <div class="text-center">
+        <p class="text-xs text-blue-600 uppercase font-bold">Total Stock</p>
+        <p class="text-2xl font-bold text-blue-800">{{ stock_summary.total_stock }}</p>
+    </div>
+    <div class="text-center">
+        <p class="text-xs text-blue-600 uppercase font-bold">Total Value</p>
+        <p class="text-2xl font-bold text-blue-800">$ {{ stock_summary.total_value|floatformat:2 }}</p>
+    </div>
+</div>
+{% endif %}
 
 <!-- Products Table in this Category -->
 <div class="bg-white rounded shadow overflow-hidden">

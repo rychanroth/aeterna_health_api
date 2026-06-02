@@ -84,7 +84,7 @@ def category_create(request):
 
         if response.status_code == 201:
             messages.success(request, 'Category created successfully!')
-            return redirect('template_categories')
+            return redirect('template-categories')
         else:
             if response.status_code == 400:
                 errors = response.json()
@@ -115,7 +115,7 @@ def category_detail(request, id):
     cat_response = api_call('GET', f'/api/categories/{id}/', token=token)
     if cat_response.status_code != 200:
         messages.error(request, 'Category not found.')
-        return redirect('template_categories')
+        return redirect('template-categories')
     category = cat_response.json()
 
     # Fetch Ancestors (for Breadcrumbs)
@@ -163,7 +163,7 @@ def category_edit(request, id):
     cat_response = api_call('GET', f'/api/categories/{id}/', token=token)
     if cat_response.status_code != 200:
         messages.error(request, 'Category not found')
-        return redirect('template_categories')
+        return redirect('template-categories')
     category_data = cat_response.json()
 
     # 2. Handle form submission
@@ -188,7 +188,7 @@ def category_edit(request, id):
 
         if response.status_code == 200:
             messages.success(request, 'Category updated successfully!')
-            return redirect('template_categories')
+            return redirect('template-categories')
         else:
             if response.status_code == 400:
                 errors = response.json()
@@ -230,7 +230,7 @@ def category_delete(request, id):
             # Often fails if it has children/products depending on API constraints
             messages.error(request, 'Failed to delete category. Ensure it has no child categories or products.')
 
-    return redirect('template_categories')
+    return redirect('template-categories')
 
 
 # === Category Tree View ===
@@ -274,7 +274,7 @@ def category_bulk_move(request):
                 data = response.json()
                 moved_count = len(data.get('moved', []))
                 messages.success(request, f'Successfully moved {moved_count} categories.')
-                return redirect('template_categories')
+                return redirect('template-categories')
             else:
                 messages.error(request, 'Failed to move categories.')
 

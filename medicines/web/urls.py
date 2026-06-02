@@ -5,13 +5,16 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('', home, name='home'),
-    path('login/', login_page, name='template_login'),
-    path('logout/', logout_view, name='template_logout'),
-    path('categories/', categories_list, name='template_categories'),
-    path('categories/create/', category_create, name='template_category_create'),
-    path('categories/<int:id>/edit/', category_edit, name='template_category_edit'),
-    path('categories/<int:id>/delete/', category_delete, name='template_category_delete'),
-    path('categories/<int:id>/', category_detail, name='template_category_detail'),
+    path('login/', login_page, name='template-login'),
+    path('logout/', logout_view, name='template-logout'),
+    path('categories/', categories_list, name='template-categories'),
+    path('categories/create/', category_create, name='template-category-create'),
+    path('categories/<int:id>/edit/', category_edit, name='template-category-edit'),
+    path('categories/<int:id>/delete/', category_delete, name='template-category-delete'),
+    path('categories/<int:id>/', category_detail, name='template-category-detail'),
+    path('categories/bulk-move/', category_bulk_move, name='template-category-bulk-move'),
+    path('categories/roots/', category_roots, name='template-category-roots'),
+    path('categories/tree/', category_tree, name='template-category-tree'),
 ]
 
 # By default, Django's development server refuses to serve media files.
