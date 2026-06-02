@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from urllib.parse import urlencode
 from medicines.web.api_helper import *
 from medicines.web.decorators import * 
 
@@ -8,18 +9,26 @@ from medicines.web.decorators import *
 def categories_list(request):
     token = request.session.get('token')
     
-    # 1. What page is the user asking for? Default to 1
+    # 1. Capture all possible query parameters from the user's request
     current_page = request.GET.get('page', 1)
-    
-    # NEW: Capture the search term (default to empty string)
     search_query = request.GET.get('search', '')
-
-    # 2. Ask the API for that page
-    # NEW: Append ?search= to the API call
-    api_url = f'/api/categories/?page={current_page}&search={search_query}'
+    ordering = request.GET.get('ordering', '') # e.g., 'name', '-created_at', 'depth'
+    
+    # 2. Build the API parameters dictionary
+    api_params = {
+        'page': current_page,
+        'search': search_query,
+        'ordering': ordering,
+    }
+    
+    # Remove keys with empty values so we don't send ?search=&ordering= to the API
+    api_params = {k: v for k, v in api_params.items() if v}
+    
+    # 3. Construct the clean API URL
+    api_url = f'/api/categories/?{urlencode(api_params)}'
     response = api_call('GET', api_url, token=token)
     
-    # 3. Setup default values
+    # 4. Setup default values
     categories = []
     next_page = None
     prev_page = None
@@ -30,14 +39,10 @@ def categories_list(request):
         categories = data.get('results', [])
         count = data.get('count', 0)
         
-        # 4. FIGURE OUT THE PAGE NUMBERS IN PYTHON
-        # If 'next' exists, it looks like: "http://127.0.0.1:8000/api/categories/?page=3"
-        # We split it by 'page=' and take the last part -> "3"
         if data.get('next'):
             next_page = data['next'].split('page=')[-1]
             
         if data.get('previous'):
-            # If 'previous' exists but is empty string (API quirk), it means page 1
             if 'page=' in data['previous']:
                 prev_page = data['previous'].split('page=')[-1]
             else:
@@ -46,13 +51,15 @@ def categories_list(request):
     else:
         messages.error(request, 'Failed to load categories')
     
-    # 5. Pass SIMPLE variables to the template
+    # 5. Pass variables to the template, including the new ordering filter
     return render(request, 'categories/categories.html', {
         'categories': categories,
-        'next_page': next_page,   # Just a number: "2" or None
-        'prev_page': prev_page,   # Just a number: "1" or None
+        'next_page': next_page,
+        'prev_page': prev_page,
         'count': count,
         'current_page': current_page,
+        'search_query': search_query,
+        'ordering': ordering,
     })
 
 @login_required_template

@@ -1,124 +1,127 @@
+<!-- templates/categories/categories.html -->
 {% extends 'base.html' %}
 
-{% block title %}Categories - Aeterna Health{% endblock %}
-
-{% block page_title %}Categories{% endblock %}
+{% block title %}Categories{% endblock %}
+{% block page_title %}Categories Management{% endblock %}
 
 {% block content %}
-<div class="bg-white rounded-lg shadow overflow-hidden">
-    <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-        <div class="flex items-center gap-4">
-            <h2 class="text-xl font-bold text-gray-800">Categories</h2>
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <p class="text-sm text-gray-500">Total categories: {{ count }}</p>
+    </div>
+    <a href="{% url 'template_category_create' %}"
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
+        + Add Category
+    </a>
+</div>
 
-            <!-- SEARCH FORM -->
-            <form method="GET" action="" class="flex">
-                <input type="text" name="search" placeholder="Search categories..." value="{{ request.GET.search }}"
-                    class="border border-gray-300 rounded-l-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 w-48">
-                <button type="submit"
-                    class="bg-gray-200 border border-l-0 border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-300">
-                    Search
-                </button>
-                <!-- ADD THIS CLEAR BUTTON -->
-                {% if request.GET.search %}
-                <a href="{% url 'template_categories' %}" class="ml-2 text-sm text-red-500 hover:text-red-700">
-                    Clear
-                </a>
-                {% endif %}
-            </form>
-        </div>
+<!-- Search & Filter Bar -->
+<form method="GET" action="{% url 'template_categories' %}"
+    class="mb-6 bg-white p-4 rounded shadow flex gap-4 items-end">
 
-        <a href="{% url 'template_category_create' %}"
-            class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
-            + Add Category
-        </a>
+    <!-- Search Input -->
+    <div class="flex-1">
+        <label class="block text-xs text-gray-600 mb-1">Search</label>
+        <input type="text" name="search" value="{{ search_query }}" placeholder="Search by name..."
+            class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
     </div>
 
-    <table class="w-full">
-        <thead class="bg-gray-800 text-white">
-            <tr>
-                <th class="p-3 text-left text-sm font-semibold">ID</th>
-                <th class="p-3 text-left text-sm font-semibold">Image</th>
-                <th class="p-3 text-left text-sm font-semibold">Name</th>
-                <th class="p-3 text-left text-sm font-semibold">Actions</th>
+    <!-- Ordering Dropdown -->
+    <div class="w-64">
+        <label class="block text-xs text-gray-600 mb-1">Order By</label>
+        <select name="ordering"
+            class="w-full border border-gray-300 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
+            <option value="">Default</option>
+            <option value="name" {% if ordering == 'name' %}selected{% endif %}>Name (A-Z)</option>
+            <option value="-name" {% if ordering == '-name' %}selected{% endif %}>Name (Z-A)</option>
+            <option value="depth" {% if ordering == 'depth' %}selected{% endif %}>Depth (Asc)</option>
+            <option value="-depth" {% if ordering == '-depth' %}selected{% endif %}>Depth (Desc)</option>
+            <option value="-created_at" {% if ordering == '-created_at' %}selected{% endif %}>Newest First</option>
+            <option value="created_at" {% if ordering == 'created_at' %}selected{% endif %}>Oldest First</option>
+        </select>
+    </div>
+
+    <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 h-10">Apply</button>
+
+    {% if search_query or ordering %}
+    <a href="{% url 'template_categories' %}" class="text-red-600 text-sm hover:underline h-10 flex items-center">Clear
+        Filters</a>
+    {% endif %}
+</form>
+
+<!-- Categories Table -->
+<div class="bg-white rounded shadow overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-800 text-white text-sm">
+                <th class="p-3">ID</th>
+                <th class="p-3">Name</th>
+                <th class="p-3">Path / Depth</th>
+                <th class="p-3">Product Type</th>
+                <th class="p-3">Products</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Actions</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-            {% for category in categories %}
-            <tr class="hover:bg-gray-50/70 transition-colors">
-                <td class="p-3 text-sm text-gray-600">{{ category.id }}</td>
-                <td class="p-3">
-                    {% if category.image %}
-                    <img src="{{ category.image }}" class="w-10 h-10 object-cover rounded border bg-gray-50">
-                    {% else %}
-                    <div
-                        class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs border border-dashed">
-                        No img
+        <tbody>
+            {% for cat in categories %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3 text-gray-600">{{ cat.id }}</td>
+                <td class="p-3 font-semibold text-gray-800">
+                    <div class="flex items-center">
+                        {% if cat.depth and cat.depth > 0 %}
+                        {% with ''|center:cat.depth as range %}
+                        {% for _ in range %}
+                        <span class="text-gray-300 font-mono select-none mr-1">&#x2514;&#x2500;</span>
+                        {% endfor %}
+                        {% endwith %}
+                        {% endif %}
+
+                        <span class="text-gray-900 ml-1">{{ cat.name }}</span>
                     </div>
+                </td>
+                <td class="p-3 text-xs text-gray-500">{{ cat.full_path|default:"-" }} (Depth: {{ cat.depth }})</td>
+                <td class="p-3">{{ cat.product_type_name|default:"-" }}</td>
+                <td class="p-3">{{ cat.products_count }}</td>
+                <td class="p-3">
+                    {% if cat.is_active %}
+                    <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Active</span>
+                    {% else %}
+                    <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded">Inactive</span>
                     {% endif %}
                 </td>
-                <td class="p-3 text-sm font-medium text-gray-900">
-                    <a href="{% url 'template_category_detail' category.id %}"
-                        class="text-teal-700 hover:text-teal-900 hover:underline">
-                        {{ category.name }}
-                    </a>
-                </td>
-                <td class="p-3 text-sm space-x-2">
-                    <a href="{% url 'template_category_edit' category.id %}"
-                        class="text-teal-600 hover:text-teal-800 font-medium">Edit</a>
-
-                    <form method="POST" action="{% url 'template_category_delete' category.id %}" class="inline"
-                        onsubmit="return confirm('Delete this category? This cannot be undone.');">
-                        {% csrf_token %}
-                        <input type="hidden" name="_method" value="DELETE">
-                        <button type="submit" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
-                    </form>
+                <td class="p-3">
+                    <div class="flex items-center gap-3">
+                        <a href="{% url 'template_category_detail' cat.id %}"
+                            class="text-blue-600 hover:underline text-xs font-medium">View</a>
+                        <a href="#" class="text-yellow-600 hover:underline text-xs font-medium">Edit</a>
+                    </div>
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="4" class="p-8 text-center text-gray-400 text-sm">
-                    {% if request.GET.search %}
-                    No categories found for "<strong>{{ request.GET.search }}</strong>".
-                    <a href="{% url 'template_categories' %}" class="text-teal-600 underline">Clear search</a>
-                    {% else %}
-                    No categories found.
-                    <a href="{% url 'template_category_create' %}" class="text-teal-600 underline">Add the first
-                        one!</a>
-                    {% endif %}
-                </td>
+                <td colspan="7" class="p-4 text-center text-gray-500">No categories found matching your criteria.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
 
-    <div class="bg-white px-4 py-4 flex items-center justify-between border-t border-gray-100">
-
+<!-- Pagination -->
+<div class="flex justify-between items-center mt-6">
+    <div>
         {% if prev_page %}
-        <a href="?page={{ prev_page }}"
-            class="inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
-            &larr; Previous
-        </a>
-        {% else %}
-        <span class="bg-gray-100 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed border">
-            Previous
-        </span>
+        {# Preserve search and ordering in pagination links! #}
+        <a href="?page={{ prev_page }}&search={{ search_query }}&ordering={{ ordering }}"
+            class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">&larr; Previous</a>
         {% endif %}
-
-        <span class="text-sm text-gray-500 font-medium">
-            Page <span class="text-gray-900 font-semibold">{{ current_page }}</span>
-        </span>
-
+    </div>
+    <span class="text-sm text-gray-600">Page {{ current_page }}</span>
+    <div>
         {% if next_page %}
-        <a href="?page={{ next_page }}"
-            class="inline-flex items-center bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition shadow-sm">
-            Next &rarr;
-        </a>
-        {% else %}
-        <span class="bg-gray-100 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed border">
-            Next
-        </span>
+        <a href="?page={{ next_page }}&search={{ search_query }}&ordering={{ ordering }}"
+            class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">Next &rarr;</a>
         {% endif %}
-
     </div>
 </div>
 {% endblock %}
