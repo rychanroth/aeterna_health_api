@@ -1,7 +1,6 @@
 from . import views
 from rest_framework.routers import DefaultRouter
 from django.urls import path
-from medicines.api import reports
 
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet, basename='user')
@@ -14,7 +13,7 @@ router.register(r'doctors', views.DoctorViewSet, basename='doctor')
 router.register(r'patients', views.PatientViewSet, basename='patient')
 router.register(r'prescriptions', views.PrescriptionViewSet, basename='prescription')
 router.register(r'stock-movements', views.StockMovementViewSet, basename='stock-movement')
-router.register(r'reports', reports.ReportViewSet, basename='reports')
+router.register(r'reports', views.ReportViewSet, basename='reports')
 
 urlpatterns = [
     path('login/', views.login, name="login")

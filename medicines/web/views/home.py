@@ -6,13 +6,15 @@ from medicines.web.decorators import *
 @login_required_template
 def home(request):
     role = request.session.get('role')
+    username = request.session.get('username')
     
+    context = {'role': role, 'username': username}
+
     # CASHIER GUARD: Defer POS screen for later
     if role == 'cashier':
-        return render(request, 'cashier_placeholder.html')
+        return render(request, 'cashier_placeholder.html', context)
     
     token = request.session.get('token')
-    context = {'role': role}
     
     # 1. Fetch Stock Alerts (Admin & Pharmacist both care about this)
     alerts_response = api_call('GET', '/api/reports/stock_alerts/', token=token)

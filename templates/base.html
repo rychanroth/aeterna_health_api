@@ -5,12 +5,13 @@
     <title>{% block title %}Aeterna Health{% endblock %}</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/output.css' %}">
+    <!-- We will inject Alpine.js here later for the Cashier POS -->
 </head>
 
 <body class="bg-gray-100 min-h-screen flex relative">
 
-    <!-- SIDEBAR -->
-    {% if request.session.role == 'admin' %}
+    <!-- SIDEBAR (Visible to Admin and Pharmacist) -->
+    {% if request.session.role == 'admin' or request.session.role == 'pharmacist' %}
     <aside class="w-64 bg-green-800 text-white sticky top-0 h-screen">
         <div class="p-4 text-xl font-bold border-b border-gray-700">
             Aeterna Health
@@ -24,18 +25,25 @@
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Suppliers</a>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Reports</a>
             {% endif %}
+            <!--
+            Admin could manage everything, because Admin could manage every User.
+            Pharmacist is a subset of Admin, tier 2 of management.
+            Cashier will have no sidebar navigation.
+            Reason: you wouldn't want cashier to navigate 5 different screens just to sell an item right?
+            It might slow the lines. Just use Alpine.js to make it interactive, and use AJAX instead.
+            -->
 
-            {% if request.session.role == 'admin' or request.session.role == 'pharmacist' %}
             <div class="text-xs text-gray-400 uppercase mt-4 mb-2">Inventory</div>
             <a href="{% url 'template_categories' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Categories</a>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Products</a>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Expired Meds</a>
+            
             <div class="text-xs text-gray-400 uppercase mt-4 mb-2">Clinical</div>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Prescriptions</a>
+            
             <div class="text-xs text-gray-400 uppercase mt-4 mb-2">Sales</div>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">New Sale</a>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Sales History</a>
-            {% endif %}
         </nav>
     </aside>
     {% endif %}
@@ -55,11 +63,21 @@
 
         <!-- MESSAGES (Errors/Success) -->
         {% if messages %}
-        <div class="p-4">
+        <div class="p-4 space-y-2">
             {% for message in messages %}
-            <div class="bg-red-100 text-red-700 p-3 rounded mb-2">
+            {% if message.tags == 'error' %}
+            <div class="bg-red-100 text-red-700 p-3 rounded border border-red-300">
                 {{ message }}
             </div>
+            {% elif message.tags == 'success' %}
+            <div class="bg-green-100 text-green-700 p-3 rounded border border-green-300">
+                {{ message }}
+            </div>
+            {% else %}
+            <div class="bg-blue-100 text-blue-700 p-3 rounded border border-blue-300">
+                {{ message }}
+            </div>
+            {% endif %}
             {% endfor %}
         </div>
         {% endif %}
