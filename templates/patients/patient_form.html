@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}{% if edit_mode %}Edit{% else %}Create{% endif %} Patient{% endblock %}
+{% block page_title %}{% if edit_mode %}Edit{% else %}Create{% endif %} Patient{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white p-8 rounded shadow">
+    <form method="POST" enctype="multipart/form-data" class="space-y-6">
+        {% csrf_token %}
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
+                <input type="text" name="name" value="{{ patient.name }}" class="w-full border border-gray-300 rounded px-3 py-2 {% if errors.name %}border-red-500{% endif %}">
+                {% if errors.name %}<p class="text-red-500 text-xs mt-1">{{ errors.name.0 }}</p>{% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input type="text" name="phone" value="{{ patient.phone }}" class="w-full border border-gray-300 rounded px-3 py-2">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                <!-- Date Picker -->
+                <input type="date" name="date_of_birth" value="{{ patient.date_of_birth }}" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                <select name="gender" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+                    <option value="" {% if patient.gender == '' or patient.gender == None %}selected{% endif %}>Unknown</option>
+                    <option value="male" {% if patient.gender == 'male' %}selected{% endif %}>Male</option>
+                    <option value="female" {% if patient.gender == 'female' %}selected{% endif %}>Female</option>
+                    <option value="other" {% if patient.gender == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <textarea name="address" rows="2" class="w-full border border-gray-300 rounded px-3 py-2">{{ patient.address }}</textarea>
+        </div>
+
+        <!-- Clinical Field -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1 text-red-600 flex items-center gap-1">
+                <i class='bx bx-error-circle'></i> Allergy Notes
+            </label>
+            <textarea name="allergy_notes" rows="3" class="w-full border border-red-300 rounded px-3 py-2 focus:ring-red-500 focus:border-red-500">{{ patient.allergy_notes }}</textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Image</label>
+            <input type="file" name="image" accept="image/*" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+            {% if edit_mode and patient.image %}<p class="text-xs text-gray-500 mt-1">Current: <a href="{{ patient.image }}" target="_blank" class="text-blue-500">View</a></p>{% endif %}
+        </div>
+
+        <div class="flex items-center">
+            <input type="checkbox" name="is_active" value="on" {% if patient.is_active == True or patient.is_active == 'on' or patient.is_active == None %}checked{% endif %} class="h-4 w-4 text-green-600 border-gray-300 rounded">
+            <label class="ml-2 block text-sm text-gray-900">Active</label>
+        </div>
+
+        <div class="flex justify-end">
+            <a href="{% url 'template-patient-list' %}" class="bg-gray-300 text-gray-700 px-4 py-2 rounded mr-2 hover:bg-gray-400">Cancel</a>
+            <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 shadow">{% if edit_mode %}Update{% else %}Create{% endif %} Patient</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
