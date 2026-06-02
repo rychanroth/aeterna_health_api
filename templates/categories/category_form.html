@@ -1,72 +1,127 @@
+<!-- templates/categories/category_form.html -->
 {% extends 'base.html' %}
 
-{% block title %}{% if edit_mode %}Edit{% else %}Add{% endif %} Category - Aeterna Health{% endblock %}
-
-{% block page_title %}{% if edit_mode %}Edit{% else %}Add{% endif %} Category{% endblock %}
+{% block title %}{% if edit_mode %}Edit Category{% else %}Create Category{% endif %}{% endblock %}
+{% block page_title %}{% if edit_mode %}Edit Category{% else %}Create Category{% endif %}{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <a href="{% url 'template_categories' %}" class="text-teal-600 hover:underline text-sm">&larr; Back to
-        Categories</a>
-</div>
+{{ parent_categories|json_script:"parent-categories-data" }}
 
-<div class="bg-white rounded-lg shadow p-6 max-w-lg">
-    <form method="POST" action="" enctype="multipart/form-data">
+<div class="max-w-3xl mx-auto bg-white p-8 rounded shadow" x-data="categoryForm()">
+    <form method="POST" enctype="multipart/form-data" class="space-y-6">
         {% csrf_token %}
 
-        <!-- ADD THIS ERROR BLOCK -->
-        {% if errors %}
-        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-            <p class="text-red-700 font-medium mb-2">Please fix the errors below:</p>
-            <ul class="text-red-600 text-sm">
-                {% for field, error_list in errors.items %}
-                <li class="mb-1"><strong>{{ field|title }}:</strong> {{ error_list.0 }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
-            <input type="text" name="name" required value="{% if edit_mode %}{{ category.name }}{% endif %}"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-        </div>
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Image</label>
-
-            <!-- Show current image if editing -->
-            {% if edit_mode and category.image %}
-            <div class="mb-2">
-                <p class="text-xs text-gray-500 mb-1">Current image:</p>
-                <img src="{{ category.image }}" class="w-20 h-20 object-cover rounded border">
-            </div>
-            <p class="text-xs text-gray-400 mb-2">Leave blank to keep current image.</p>
-            {% endif %}
-
-            <input type="file" name="image" accept="image/*"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Product Type <span
+        <!-- Name Field -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category Name <span
                     class="text-red-500">*</span></label>
-            <select name="product_type_id" required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+            <input type="text" name="name" value="{{ category.name }}"
+                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 {% if errors.name %}border-red-500{% endif %}">
+            {% if errors.name %}
+            <p class="text-red-500 text-xs mt-1">{{ errors.name.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Product Type -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
+            <select name="product_type_id" @change="filterCategories($event.target.value)"
+                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
                 <option value="">-- Select Product Type --</option>
                 {% for pt in product_types %}
-                <!-- Check if this pt.id matches the category's current product_type id -->
-                <option value="{{ pt.id }}" {% if edit_mode and pt.id == category.product_type.id %}selected{% endif %}>
+                {# Logic: If editing, match API ID. If error, match submitted ID. #}
+                <option value="{{ pt.id }}" {% if category.product_type_id|stringformat:"s" == pt.id|stringformat:"s" or category.product_type.id|stringformat:"s" == pt.id|stringformat:"s" %}selected{% endif %}>
                     {{ pt.name }}
                 </option>
                 {% endfor %}
             </select>
+            {% if errors.product_type_id %}
+            <p class="text-red-500 text-xs mt-1">{{ errors.product_type_id.0 }}</p>
+            {% endif %}
         </div>
 
-        <button type="submit"
-            class="bg-teal-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-teal-700 transition">
-            {% if edit_mode %}Update{% else %}Create{% endif %} Category
-        </button>
+        <!-- Parent Category -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Parent Category</label>
+            <select name="parent_id"
+                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">-- Root Level Category --</option>
+                <template x-for="cat in filteredCategories" :key="cat.id">
+                    <option :value="cat.id" x-text="cat.name"
+                        :selected="cat.id  ==  {{ category.parent_id|default:'null' }} || cat.id  ==  {{ category.parent|default:'null' }}">
+                    </option>
+                </template>
+            </select>
+            {% if errors.parent_id %}
+            <p class="text-red-500 text-xs mt-1">{{ errors.parent_id.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Image Upload -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category Image</label>
+            <input type="file" name="image" accept="image/*"
+                class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+            {% if edit_mode and category.image %}
+            <p class="text-xs text-gray-500 mt-1">Current image: <a href="{{ category.image }}" target="_blank"
+                    class="text-blue-500">View</a></p>
+            {% endif %}
+            {% if errors.image %}
+            <p class="text-red-500 text-xs mt-1">{{ errors.image.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Is Active -->
+        <div class="flex items-center">
+            {# For checkboxes, we check if it was explicitly turned off, otherwise keep it checked #}
+            <input type="checkbox" name="is_active" value="on" {% if category.is_active == True or category.is_active == 'on' or category.is_active == None %}checked{% endif %}
+                class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+            <label class="ml-2 block text-sm text-gray-900">Active</label>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex justify-end">
+            <a href="{% url 'template_categories' %}"
+                class="bg-gray-300 text-gray-700 px-4 py-2 rounded mr-2 hover:bg-gray-400">Cancel</a>
+            <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 shadow">
+                {% if edit_mode %}Update Category{% else %}Create Category{% endif %}
+            </button>
+        </div>
     </form>
 </div>
+
+<script>
+    function categoryForm() {
+        return {
+            allCategories: [],
+            filteredCategories: [],
+
+            init() {
+                const dataEl = document.getElementById('parent-categories-data');
+                if (dataEl) {
+                    this.allCategories = JSON.parse(dataEl.textContent);
+                }
+
+                // Determine the initially selected product type to trigger the filter
+                {% if category.product_type_id %}
+                this.filterCategories('{{ category.product_type_id }}');
+                {% elif category.product_type.id %}
+                this.filterCategories('{{ category.product_type.id }}');
+                {% else %}
+        this.filteredCategories = this.allCategories;
+        {% endif %}
+    },
+
+    filterCategories(productTypeId) {
+        if (!productTypeId) {
+            this.filteredCategories = this.allCategories;
+        } else {
+            this.filteredCategories = this.allCategories.filter(cat =>
+                cat.product_type && cat.product_type.id  ==  productTypeId
+            );
+        }
+    }
+        }
+    }
+</script>
 {% endblock %}

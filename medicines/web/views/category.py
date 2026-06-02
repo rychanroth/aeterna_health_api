@@ -113,44 +113,51 @@ def category_detail(request, id):
         'current_page': page,
     })
     
+# medicines/web/views/category.py
+
 @login_required_template
 def category_create(request):
     token = request.session.get('token')
-    errors = {}  # Initialize empty errors dict
-    
+    errors = {}
+    old_input = {} # Initialize empty
+
     if request.method == 'POST':
         data = {
             'name': request.POST.get('name'),
-            'product_type_id': request.POST.get('product_type_id'),
+            'product_type_id': request.POST.get('product_type_id') or None,
+            'parent_id': request.POST.get('parent_id') or None,
+            'is_active': request.POST.get('is_active') == 'on',
         }
-        
-        # Handle parent dropdown (if selected)
-        parent_id = request.POST.get('parent')
-        if parent_id:
-            data['parent'] = parent_id
-            
-        # Handle file
+
         files = None
         if 'image' in request.FILES:
             files = {'image': request.FILES['image']}
-            
+
         response = api_call('POST', '/api/categories/', data=data, token=token, files=files)
-        
+
         if response.status_code == 201:
             messages.success(request, 'Category created successfully!')
             return redirect('template_categories')
         else:
-            # Parse the DRF error JSON
-            errors = response.json()
-    
-    # Fetch product types for the dropdown (we'll add the HTML next)
+            if response.status_code == 400:
+                errors = response.json()
+                old_input = request.POST # <--- KEEP THE OLD INPUT ALIVE
+            else:
+                messages.error(request, 'An unexpected error occurred.')
+
+    # Fetch dropdown data
     pt_response = api_call('GET', '/api/product-types/', token=token)
     product_types = pt_response.json().get('results', []) if pt_response.status_code == 200 else []
-    
+
+    cat_response = api_call('GET', '/api/categories/?page_size=50', token=token) 
+    parent_categories = cat_response.json().get('results', []) if cat_response.status_code == 200 else []
+
     return render(request, 'categories/category_form.html', {
         'edit_mode': False,
         'errors': errors,
         'product_types': product_types,
+        'parent_categories': parent_categories,
+        'category': old_input or {}, # <--- PASS IT AS CATEGORY CONTEXT
     })
 
 @login_required_template
