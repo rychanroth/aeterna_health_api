@@ -103,14 +103,20 @@
                 }
 
                 // Determine the initially selected product type to trigger the filter
+                // Handle both old_input (string) and API object (nested object)
+                let initialTypeId = null;
                 {% if category.product_type_id %}
-                this.filterCategories('{{ category.product_type_id }}');
-                {% elif category.product_type.id %}
-                this.filterCategories('{{ category.product_type.id }}');
-                {% else %}
-        this.filteredCategories = this.allCategories;
-        {% endif %}
-    },
+                    initialTypeId = '{{ category.product_type_id }}'; // Comes from POST old_input
+                {% elif category.product_type and category.product_type.id %}
+                    initialTypeId = '{{ category.product_type.id }}'; // Comes from API GET
+                {% endif %}
+
+                if (initialTypeId) {
+                    this.filterCategories(initialTypeId);
+                } else {
+                    this.filteredCategories = this.allCategories;
+                }
+            },
 
     filterCategories(productTypeId) {
         if (!productTypeId) {

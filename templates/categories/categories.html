@@ -3,123 +3,133 @@
 {% block title %}Categories{% endblock %}
 {% block page_title %}Categories Management{% endblock %}
 {% block content %}
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <p class="text-sm text-gray-500">Total categories: {{ count }}</p>
-        </div>
-        <a href="{% url 'template_category_create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">+ Add Category</a>
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <p class="text-sm text-gray-500">Total categories: {{ count }}</p>
     </div>
-    <!-- Search & Filter Bar -->
-    <form method="get"
-        action="{% url 'template_categories' %}"
-        class="mb-6 bg-white p-4 rounded shadow flex gap-4 items-end">
-        <!-- Search Input -->
-        <div class="flex-1">
-            <label class="block text-xs text-gray-600 mb-1">Search</label>
-            <input type="text"
-                name="search"
-                value="{{ search_query }}"
-                placeholder="Search by name..."
-                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
-        </div>
-        <!-- Ordering Dropdown -->
-        <div class="w-64">
-            <label class="block text-xs text-gray-600 mb-1">Order By</label>
-            <select name="ordering"
-                    class="w-full border border-gray-300 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="">Default</option>
-                <option value="name" {% if ordering == 'name' %}selected{% endif %}>Name (A-Z)</option>
-                <option value="-name" {% if ordering == '-name' %}selected{% endif %}>Name (Z-A)</option>
-                <option value="depth" {% if ordering == 'depth' %}selected{% endif %}>Depth (Asc)</option>
-                <option value="-depth" {% if ordering == '-depth' %}selected{% endif %}>Depth (Desc)</option>
-                <option value="-created_at"
-                        {% if ordering == '-created_at' %}selected{% endif %}>Newest First</option>
-                <option value="created_at"
-                        {% if ordering == 'created_at' %}selected{% endif %}>Oldest First</option>
-            </select>
-        </div>
-        <button type="submit"
-                class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 h-10">Apply</button>
-        {% if search_query or ordering %}
-            <a href="{% url 'template_categories' %}" class="text-red-600 text-sm hover:underline h-10 flex items-center">Clear
-            Filters</a>
+    <a href="{% url 'template_category_create' %}"
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">+ Add Category</a>
+</div>
+<!-- Search & Filter Bar -->
+<form method="get" action="{% url 'template_categories' %}"
+    class="mb-6 bg-white p-4 rounded shadow flex gap-4 items-end">
+    <!-- Search Input -->
+    <div class="flex-1">
+        <label class="block text-xs text-gray-600 mb-1">Search</label>
+        <input type="text" name="search" value="{{ search_query }}" placeholder="Search by name..."
+            class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+    </div>
+    <!-- Ordering Dropdown -->
+    <div class="w-64">
+        <label class="block text-xs text-gray-600 mb-1">Order By</label>
+        <select name="ordering"
+            class="w-full border border-gray-300 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
+            <option value="">Default</option>
+            <option value="name" {% if ordering == 'name' %}selected{% endif %}>Name (A-Z)</option>
+            <option value="-name" {% if ordering == '-name' %}selected{% endif %}>Name (Z-A)</option>
+            <option value="depth" {% if ordering == 'depth' %}selected{% endif %}>Depth (Asc)</option>
+            <option value="-depth" {% if ordering == '-depth' %}selected{% endif %}>Depth (Desc)</option>
+            <option value="-created_at" {% if ordering == '-created_at' %}selected{% endif %}>Newest First</option>
+            <option value="created_at" {% if ordering == 'created_at' %}selected{% endif %}>Oldest First</option>
+        </select>
+    </div>
+    <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 h-10">Apply</button>
+    {% if search_query or ordering %}
+    <a href="{% url 'template_categories' %}" class="text-red-600 text-sm hover:underline h-10 flex items-center">Clear
+        Filters</a>
+    {% endif %}
+</form>
+<!-- Categories Table -->
+<div class="bg-white rounded shadow overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-800 text-white text-sm">
+                <th class="p-3">ID</th>
+                <th class="p-3">Image</th>
+                <th class="p-3">Name</th>
+                <th class="p-3">Path / Depth</th>
+                <th class="p-3">Product Type</th>
+                <th class="p-3">Products</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3 text-gray-600">{{ cat.id }}</td>
+                <td class="p-3">
+                    {% if cat.image %}
+                    <img src="{{ cat.image }}" class="w-7 h-7 object-cover rounded">
+                    {% else %}
+                    <div
+                        class="w-[30px] h-[30px] bg-gray-100 border border-gray-200 rounded flex items-center justify-center text-gray-400 text-lg">
+                        <i class="bx bx-image"></i>
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="p-3 font-semibold text-gray-800">
+                    <div class="flex items-center">
+                        {% if cat.depth and cat.depth > 0 %}
+                        {% with ''|center:cat.depth as range %}
+                        {% for _ in range %}<span
+                            class="text-gray-300 font-mono select-none mr-1">&#x2514;&#x2500;</span>{% endfor %}
+                        {% endwith %}
+                        {% endif %}
+                        <a href="{% url 'template_category_detail' cat.id %}" class="hover:text-green-700">{{ cat.name
+                            }}</a>
+                    </div>
+                </td>
+                <td class="p-3 text-xs text-gray-500">{{ cat.full_path|default:"-" }} (Depth: {{ cat.depth }})</td>
+                <td class="p-3">{{ cat.product_type_name|default:"-" }}</td>
+                <td class="p-3">{{ cat.products_count }}</td>
+                <td class="p-3">
+                    {% if cat.is_active %}
+                    <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Active</span>
+                    {% else %}
+                    <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="p-3">
+                    <div class="flex items-center gap-3.5">
+                        <a href="{% url 'template_category_edit' cat.id %}"
+                            class="text-amber-500 hover:text-amber-600 transition-colors text-xl inline-flex items-center justify-center"
+                            title="Edit Category">
+                            <i class="bx bx-edit-alt"></i>
+                        </a>
+
+                        <a href="#"
+                            class="text-red-500 hover:text-red-600 transition-colors text-xl inline-flex items-center justify-center"
+                            title="Delete Category"
+                            onclick="return confirm('Are you sure you want to delete this category?');">
+                            <i class="bx bx-trash"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="p-4 text-center text-gray-500">No categories found matching your criteria.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<!-- Pagination -->
+<div class="flex justify-between items-center mt-6">
+    <div>
+        {% if prev_page %}
+        {# Preserve search and ordering in pagination links! #}
+        <a href="?page={{ prev_page }}&search={{ search_query }}&ordering={{ ordering }}"
+            class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">&larr; Previous</a>
         {% endif %}
-    </form>
-    <!-- Categories Table -->
-    <div class="bg-white rounded shadow overflow-hidden">
-        <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="bg-gray-800 text-white text-sm">
-                    <th class="p-3">ID</th>
-                    <th class="p-3">Image</th>
-                    <th class="p-3">Name</th>
-                    <th class="p-3">Path / Depth</th>
-                    <th class="p-3">Product Type</th>
-                    <th class="p-3">Products</th>
-                    <th class="p-3">Status</th>
-                    <th class="p-3">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for cat in categories %}
-                    <tr class="border-b hover:bg-gray-50 text-sm">
-                        <td class="p-3 text-gray-600">{{ cat.id }}</td>
-                        <td class="p-3">
-                            {% if cat.image %}
-                                <img src="{{ cat.image.url }}"class="w-[30px] h-[30px] object-cover rounded">
-                            {% else %}
-                                <div class="w-[30px] h-[30px] bg-gray-100 border border-gray-200 rounded flex items-center justify-center text-gray-400 text-lg">
-                                    <i class="bx bx-image"></i>
-                                </div>
-                            {% endif %}
-                        </td>
-                        <td class="p-3 font-semibold text-gray-800">
-                            <div class="flex items-center">
-                                {% if cat.depth and cat.depth > 0 %}
-                                    {% with ''|center:cat.depth as range %}
-                                        {% for _ in range %}<span class="text-gray-300 font-mono select-none mr-1">&#x2514;&#x2500;</span>{% endfor %}
-                                    {% endwith %}
-                                {% endif %}
-                                <a href="{% url 'template_category_detail' cat.id %}" class="hover:text-green-700">{{ cat.name }}</a>
-                            </div>
-                        </td>
-                        <td class="p-3 text-xs text-gray-500">{{ cat.full_path|default:"-" }} (Depth: {{ cat.depth }})</td>
-                        <td class="p-3">{{ cat.product_type_name|default:"-" }}</td>
-                        <td class="p-3">{{ cat.products_count }}</td>
-                        <td class="p-3">
-                            {% if cat.is_active %}
-                                <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Active</span>
-                            {% else %}
-                                <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded">Inactive</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3">
-                            <div class="flex items-center gap-3">
-                                <a href="#" class="text-yellow-600 hover:underline text-xs font-medium">Edit</a>
-                            </div>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="7" class="p-4 text-center text-gray-500">No categories found matching your criteria.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
     </div>
-    <!-- Pagination -->
-    <div class="flex justify-between items-center mt-6">
-        <div>
-            {% if prev_page %}
-                {# Preserve search and ordering in pagination links! #}
-                <a href="?page={{ prev_page }}&search={{ search_query }}&ordering={{ ordering }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">&larr; Previous</a>
-            {% endif %}
-        </div>
-        <span class="text-sm text-gray-600">Page {{ current_page }}</span>
-        <div>
-            {% if next_page %}
-                <a href="?page={{ next_page }}&search={{ search_query }}&ordering={{ ordering }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">Next &rarr;</a>
-            {% endif %}
-        </div>
+    <span class="text-sm text-gray-600">Page {{ current_page }}</span>
+    <div>
+        {% if next_page %}
+        <a href="?page={{ next_page }}&search={{ search_query }}&ordering={{ ordering }}"
+            class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">Next &rarr;</a>
+        {% endif %}
     </div>
+</div>
 {% endblock %}
