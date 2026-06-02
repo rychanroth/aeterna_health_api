@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Supplier: {{ supplier.name }}{% endblock %}
+{% block page_title %}Supplier Details{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'template-supplier-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Suppliers</a>
+</div>
+
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">{{ supplier.name }}</h2>
+    <div class="flex items-center gap-3">
+        <a href="{% url 'template-supplier-edit' supplier.id %}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow text-sm flex items-center gap-1"><i class='bx bx-edit'></i> Edit</a>
+        <form method="POST" action="{% url 'template-supplier-delete' supplier.id %}" onsubmit="return confirm('Are you sure?');">
+            {% csrf_token %}<input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow text-sm flex items-center gap-1"><i class='bx bx-trash'></i> Delete</button>
+        </form>
+    </div>
+</div>
+
+<!-- Info Card -->
+<div class="bg-white p-6 rounded shadow mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="col-span-1">
+        {% if supplier.image %}
+        <img src="{{ supplier.image }}" class="w-full h-48 object-cover rounded">
+        {% else %}
+        <div class="w-full h-48 bg-gray-100 border border-gray-200 rounded flex items-center justify-center text-gray-400 text-5xl">
+            <i class="bx bx-image"></i>
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-span-2 space-y-3 text-sm">
+        <p><span class="font-semibold text-gray-700">Phone:</span> {{ supplier.phone|default:"N/A" }}</p>
+        <p><span class="font-semibold text-gray-700">Address:</span> {{ supplier.address|default:"N/A" }}</p>
+        <p><span class="font-semibold text-gray-700">Products Supplied:</span> {{ supplier.products_count }}</p>
+        <p><span class="font-semibold text-gray-700">Status:</span> {% if supplier.is_active %}<span class="text-green-600">Active</span>{% else %}<span class="text-red-600">Inactive</span>{% endif %}</p>
+        <p class="text-xs text-gray-500 mt-4">Created: {{ supplier.created_at|date:"M d, Y H:i" }}</p>
+    </div>
+</div>
+{% endblock %}

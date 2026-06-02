@@ -24,6 +24,13 @@ urlpatterns = [
     path('product-types/<int:id>/', product_type_detail, name='template-product-type-detail'),
     path('product-types/<int:id>/edit/', product_type_edit, name='template-product-type-edit'),
     path('product-types/<int:id>/delete/', product_type_delete, name='template-product-type-delete'),
+
+    # SUPPLIER
+    path('suppliers/', supplier_list, name='template-supplier-list'),
+    path('suppliers/create/', supplier_create, name='template-supplier-create'),
+    path('suppliers/<int:id>/', supplier_detail, name='template-supplier-detail'),
+    path('suppliers/<int:id>/edit/', supplier_edit, name='template-supplier-edit'),
+    path('suppliers/<int:id>/delete/', supplier_delete, name='template-supplier-delete'),
 ]
 
 # By default, Django's development server refuses to serve media files.
