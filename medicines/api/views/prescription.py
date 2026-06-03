@@ -9,6 +9,7 @@ from medicines.api.permissions import IsAdmin, IsPharmacist
 class PrescriptionViewSet(viewsets.ModelViewSet):
     queryset = Prescription.objects.all()
     serializer_class = PrescriptionSerializer
+    search_fields = ['prescription_number', 'doctor__name', 'patient__name', 'notes']
 
     def get_permissions(self):
         if self.action in ['verify', 'reject']:
