@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Movements{% endblock %}
+{% block page_title %}Stock Ledger{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <p class="text-sm text-gray-500">Total Records: {{ count }}</p>
+    <!-- Create button will be added in M5.3 -->
+</div>
+
+<!-- Filter Bar -->
+<form method="GET" action="{% url 'template-stock-movement-list' %}" class="mb-6 bg-white p-4 rounded shadow">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        
+        <!-- Direction Filter -->
+        <div>
+            <label class="block text-xs text-gray-600 mb-1">Direction</label>
+            <select name="direction" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+                <option value="">All</option>
+                <option value="in" {% if direction == 'in' %}selected{% endif %}>Stock In</option>
+                <option value="out" {% if direction == 'out' %}selected{% endif %}>Stock Out</option>
+            </select>
+        </div>
+
+        <!-- Product Filter -->
+        <div>
+            <label class="block text-xs text-gray-600 mb-1">Product</label>
+            <select name="product" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+                <option value="">All Products</option>
+                {% for prod in products %}
+                <option value="{{ prod.id }}" {% if product_id|stringformat:"s" == prod.id|stringformat:"s" %}selected{% endif %}>
+                    {{ prod.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Start Date -->
+        <div>
+            <label class="block text-xs text-gray-600 mb-1">Start Date</label>
+            <input type="date" name="start_date" value="{{ start_date }}" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+        </div>
+
+        <!-- End Date -->
+        <div>
+            <label class="block text-xs text-gray-600 mb-1">End Date</label>
+            <input type="date" name="end_date" value="{{ end_date }}" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+        </div>
+
+        <div class="flex gap-2">
+            <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 w-full">Filter</button>
+            <a href="{% url 'template-stock-movement-list' %}" class="bg-gray-200 text-gray-700 px-3 py-2 rounded hover:bg-gray-300 text-center" title="Clear Filters">
+                <i class='bx bx-x'></i>
+            </a>
+        </div>
+    </div>
+</form>
+
+<!-- Ledger Table -->
+<div class="bg-white rounded shadow overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-800 text-white text-sm">
+                <th class="p-3">Date</th>
+                <th class="p-3">Product</th>
+                <th class="p-3">Reason</th>
+                <th class="p-3">Direction</th>
+                <th class="p-3">Quantity</th>
+                <th class="p-3">Supplier / Sale</th>
+                <th class="p-3">Recorded By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in movements %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3 text-gray-600 text-xs">{{ mov.created_at|date:"M d, Y h:i A" }}</td>
+                <td class="p-3 font-semibold text-gray-800">{{ mov.product_name }}</td>
+                <td class="p-3 text-gray-600">{{ mov.get_movement_type_display|default:mov.movement_type }}</td>
+                
+                <!-- Direction Badge -->
+                <td class="p-3">
+                    {% if mov.is_stock_in %}
+                    <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded flex items-center gap-1 w-max">
+                        <i class='bx bx-log-in'></i> IN
+                    </span>
+                    {% else %}
+                    <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded flex items-center gap-1 w-max">
+                        <i class='bx bx-log-out'></i> OUT
+                    </span>
+                    {% endif %}
+                </td>
+
+                <!-- Quantity (Color coded by direction) -->
+                <td class="p-3 font-bold {% if mov.is_stock_in %}text-green-600{% else %}text-red-600{% endif %}">
+                    {% if mov.is_stock_in %}+{% else %}-{% endif %}{{ mov.quantity }}
+                </td>
+
+                <td class="p-3 text-gray-600 text-xs">
+                    {% if mov.supplier_name %} 
+                        <span class="text-blue-600">{{ mov.supplier_name }}</span> 
+                    {% elif mov.sale_number %} 
+                        Sale #{{ mov.sale_number }}
+                    {% else %}
+                        <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+                
+                <td class="p-3 text-gray-500 text-xs">{{ mov.created_by_name|default:"System" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="p-4 text-center text-gray-500">No stock movements found for the selected filters.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+<div class="flex justify-between items-center mt-6">
+    {% if prev_page %}
+    <a href="?page={{ prev_page }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">&larr; Previous</a>
+    {% endif %}
+    <span class="text-sm text-gray-600">Page {{ current_page }}</span>
+    {% if next_page %}
+    <a href="?page={{ next_page }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">Next &rarr;</a>
+    {% endif %}
+</div>
+{% endblock %}
