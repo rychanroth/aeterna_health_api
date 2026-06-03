@@ -63,7 +63,6 @@ urlpatterns = [
     # SALES
     path('sales', sale_list, name='template-sale-list'),
     path('sales/<int:id>/', sale_detail, name='template-sale-detail'),
-    path('sales/create/', sale_create, name='template-sale-create'),
 
     # POS
     path('pos/', pos_screen, name='template-pos-screen'),

@@ -481,7 +481,17 @@
                     this.historyError = '';
                     
                     try {
-                        const res = await fetch('/api/sales/my_sales/', { credentials: 'include' });
+                        // Build headers dynamically and attach the token
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (this.token) {
+                            headers['Authorization'] = `Token ${this.token}`; // Change to `Bearer ${this.token}` if using JWT
+                        }
+
+                        const res = await fetch('/api/sales/my_sales/', { 
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: headers // <-- Attach the headers containing the authorization token
+                        });
                         const data = await res.json();
                         
                         if (res.ok) {
