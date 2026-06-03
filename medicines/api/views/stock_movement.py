@@ -37,7 +37,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(movement_type__in=out_reasons)
         supplier_id = self.request.query_params.get('supplier')
         if supplier_id:
-            queryset = queryset.filter(suppliers_id=supplier_id)
+            queryset = queryset.filter(supplier_id=supplier_id)
         sale_id = self.request.query_params.get('sale')
         if sale_id:
             queryset = queryset.filter(sale_id=sale_id)

@@ -27,7 +27,8 @@ class StockMovement(CoreAbstractModel):
 
     product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='stock_movements')
     movement_type = models.CharField(max_length=20, choices=Reason.choices, verbose_name='reason')
-    suppliers = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_movements', help_text="For IN movements from Suppliers")
+    
+    supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_movements', help_text="For IN movements from Suppliers")
     sale = models.ForeignKey('Sale', on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_movements', help_text="For OUT movements from Sales")
     sale_item = models.ForeignKey('SaleItem', on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.IntegerField()
@@ -62,7 +63,7 @@ class StockMovement(CoreAbstractModel):
                 product=product,
                 movement_type=cls.Reason.PURCHASE,
                 quantity=quantity,
-                suppliers=supplier,
+                supplier=supplier, # Fixed variable name
                 unit_cost=unit_cost,
                 notes=notes,
                 created_by=user
@@ -91,26 +92,26 @@ class StockMovement(CoreAbstractModel):
         super().clean()
         if self.is_stock_in and self.sale:
             raise ValidationError({'sale': 'Sale reference should not be set for stock IN movements.'})
-        if self.is_stock_out and self.suppliers:
-            raise ValidationError({'suppliers': 'Supplier reference should not be set for stock OUT movements.'})
+        if self.is_stock_out and self.supplier: # Fixed field name
+            raise ValidationError({'supplier': 'Supplier reference should not be set for stock OUT movements.'})
         if self.quantity <= 0:
             raise ValidationError({'quantity': 'Quantity must be a positive number.'})
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
+        # CONSTRAINT ENFORCEMENT: Cannot update an existing movement
+        if self.pk is not None:
+            raise ValidationError("Stock movements are immutable and cannot be updated. Please create a new adjustment instead.")
+        
         self.clean()
 
         with transaction.atomic():
             super().save(*args, **kwargs)
 
-            if is_new and self.product:
+            if self.product:
                 change = self.quantity if self.is_stock_in else -self.quantity
                 self.product.stock_quantity += change
                 self.product.save(update_fields=['stock_quantity'])
 
     def delete(self, *args, **kwargs):
-        if self.product:
-            change = self.quantity if self.is_stock_in else -self.quantity
-            self.product.stock_quantity -= change
-            self.product.save(update_fields=['stock_quantity'])
-        super().delete(*args, **kwargs)
+        # CONSTRAINT ENFORCEMENT: Cannot delete a movement
+        raise ValidationError("Stock movements cannot be deleted as they are immutable ledger records.")

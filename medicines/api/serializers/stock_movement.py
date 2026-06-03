@@ -3,7 +3,7 @@ from medicines.core.models import StockMovement, Product, Supplier, Sale
 
 class StockMovementSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
-    supplier_name = serializers.ReadOnlyField(source='suppliers.name')
+    supplier_name = serializers.ReadOnlyField(source='supplier.name')
     sale_number = serializers.ReadOnlyField(source='sale.sale_number')
     created_by_name = serializers.SerializerMethodField()
     is_stock_in = serializers.BooleanField(read_only=True)
@@ -17,7 +17,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
     )
     supplier_id = serializers.PrimaryKeyRelatedField(
         queryset=Supplier.objects.all(),
-        source='suppliers',
+        source='supplier',
         write_only=True,
         allow_null=True,
         required=False
