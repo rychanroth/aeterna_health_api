@@ -12,6 +12,7 @@ from drf_spectacular.utils import extend_schema, inline_serializer
 class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
     serializer_class = SaleSerializer
+    search_fields = ['sale_number', 'notes']
 
     def get_permissions(self):
         if self.action == 'create':

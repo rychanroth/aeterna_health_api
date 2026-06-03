@@ -28,11 +28,21 @@ class Sale(CoreAbstractModel):
         return sum(item.subtotal for item in self.items.all())
 
     def save(self, *args, **kwargs):
+        # CONSTRAINT ENFORCEMENT: Cannot update a sale audit trail
+        if self.pk is not None:
+            raise ValidationError("Sales are immutable audit trails and cannot be updated. Please void and create a new one if correction is needed.")
+        
+        # Auto-generate sale number on creation
         if not self.pk:
             today = datetime.date.today()
             count = Sale.objects.filter(created_at__date=today).count() + 1
             self.sale_number = f"SL-{today.strftime('%Y%m%d')}-{count:04d}"
+            
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # CONSTRAINT ENFORCEMENT: Cannot delete a sale audit trail
+        raise ValidationError("Sales cannot be deleted as they are immutable audit records.")
 
 
 class SaleItem(CoreAbstractModel):
@@ -54,8 +64,9 @@ class SaleItem(CoreAbstractModel):
                 })
 
     def save(self, *args, **kwargs):
+        # CONSTRAINT ENFORCEMENT: Cannot update a sale item audit trail
         if self.pk is not None:
-            raise ValidationError("SaleItem cannot be updated. Delete and create a new one instead.")
+            raise ValidationError("Sale items cannot be updated. Please void the sale and create a new one if correction is needed.")
 
         self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
 
@@ -63,13 +74,16 @@ class SaleItem(CoreAbstractModel):
             super().save(*args, **kwargs)
 
             if self.product:
-                from .stock_movement import StockMovement # Import here to prevent circular imports
+                from .stock_movement import StockMovement # Prevent circular import
                 
+                # Re-fetch product inside transaction to lock it and ensure stock hasn't changed
+                self.product.refresh_from_db()
                 if self.product.stock_quantity < self.quantity:
                     raise ValidationError({
                         'quantity': f'Insufficient stock for {self.product.name}'
                     })
 
+                # Automatically create the immutable Stock Movement ledger entry
                 StockMovement.objects.create(
                     product=self.product,
                     movement_type=StockMovement.Reason.SALE,
@@ -80,22 +94,15 @@ class SaleItem(CoreAbstractModel):
                     created_by=self.sale.cashier
                 )
 
+            # Recalculate and update the parent Sale total
             self.sale.total_amount = self.sale.calculate_total()
-            self.sale.save(update_fields=['total_amount'])
+            # Bypass the Sale.save() update constraint for internal calculation updates
+            Sale.objects.filter(pk=self.sale.pk).update(total_amount=self.sale.total_amount)
 
     def delete(self, *args, **kwargs):
-        with transaction.atomic():
-            if self.product:
-                from .stock_movement import StockMovement
-                movement = StockMovement.objects.filter(sale_item=self).first()
-                if movement:
-                    movement.delete()
-
-            sale = self.sale
-            super().delete(*args, **kwargs)
-
-            sale.total_amount = sale.calculate_total()
-            sale.save(update_fields=['total_amount'])
+        # CONSTRAINT ENFORCEMENT: Cannot delete a sale item audit trail
+        # This also prevents orphaning the immutable StockMovement records
+        raise ValidationError("Sale items cannot be deleted as they are immutable audit records.")
 
     def __str__(self):
         return f"{self.sale.sale_number} - {self.product}"

@@ -58,6 +58,10 @@ urlpatterns = [
     path('prescriptions/<int:id>/', prescription_detail, name='template-prescription-detail'),
     path('prescriptions/<int:id>/verify/', prescription_verify, name='template-prescription-verify'),
     path('prescriptions/<int:id>/reject/', prescription_reject, name='template-prescription-reject'),
+
+    # SALES
+    path('sales', sale_list, name='template-sale-list'),
+    path('sales/<int:id>/', sale_detail, name='template-sale-detail'),
 ]
 
 # By default, Django's development server refuses to serve media files.

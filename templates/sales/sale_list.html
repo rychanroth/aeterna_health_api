@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Sales History{% endblock %}
+{% block page_title %}Sales History{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div class="flex items-center gap-2">
+        <p class="text-sm text-gray-500">Total Records: {{ count }}</p>
+    </div>
+    <!-- POS Create button will be added in M7.3 -->
+</div>
+
+<!-- Quick Filters & Search -->
+<div class="mb-6 bg-white p-4 rounded shadow">
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-2">
+            <a href="{% url 'template-sale-list' %}" class="px-3 py-1 rounded shadow text-sm {% if not quick_filter %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">All Sales</a>
+            <a href="?filter=today" class="px-3 py-1 rounded shadow text-sm {% if quick_filter == 'today' %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}"><i class='bx bx-calendar'></i> Today</a>
+            <a href="?filter=my_sales" class="px-3 py-1 rounded shadow text-sm {% if quick_filter == 'my_sales' %}bg-purple-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}"><i class='bx bx-user'></i> My Sales</a>
+        </div>
+    </div>
+
+    <!-- Standard Search/Date Filter (Only show if quick filter is not active) -->
+    {% if not quick_filter %}
+    <form method="GET" action="{% url 'template-sale-list' %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div>
+            <label class="block text-xs text-gray-600 mb-1">Search</label>
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Sale #, Notes..." class="w-full border border-gray-300 rounded px-3 py-2">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600 mb-1">Start Date</label>
+            <input type="date" name="start_date" value="{{ start_date }}" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600 mb-1">End Date</label>
+            <input type="date" name="end_date" value="{{ end_date }}" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 w-full">Filter</button>
+            <a href="{% url 'template-sale-list' %}" class="bg-gray-200 text-gray-700 px-3 py-2 rounded hover:bg-gray-300 text-center" title="Clear"><i class='bx bx-x'></i></a>
+        </div>
+    </form>
+    {% else %}
+    <div class="text-sm text-gray-500 text-right"><a href="{% url 'template-sale-list' %}" class="text-green-600 hover:underline">Clear Quick Filter</a></div>
+    {% endif %}
+</div>
+
+<!-- Sales Table -->
+<div class="bg-white rounded shadow overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-800 text-white text-sm">
+                <th class="p-3">Sale #</th>
+                <th class="p-3">Date & Time</th>
+                <th class="p-3">Cashier</th>
+                <th class="p-3">Prescription</th>
+                <th class="p-3">Payment</th>
+                <th class="p-3">Total Amount</th>
+                <th class="p-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3 font-bold text-green-700">{{ sale.sale_number }}</td>
+                <td class="p-3 text-gray-600 text-xs">{{ sale.created_at|date:"M d, Y h:i A" }}</td>
+                <td class="p-3 text-gray-800">{{ sale.cashier_name|default:"System" }}</td>
+                <td class="p-3">
+                    {% if sale.prescription %}
+                    <span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">Rx Attached</span>
+                    {% else %}
+                    <span class="text-gray-400 text-xs">None</span>
+                    {% endif %}
+                </td>
+                <td class="p-3">
+                    <span class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded capitalize">{{ sale.payment_method }}</span>
+                </td>
+                <td class="p-3 font-bold text-gray-900">$ {{ sale.total_amount|floatformat:2 }}</td>
+                <td class="p-3">
+                    <div class="flex items-center">
+                        <a href="{% url 'template-sale-detail' sale.id %}" title="View Receipt" class="text-blue-600 hover:text-blue-800"><i class='bx bx-receipt text-xl'></i></a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="p-4 text-center text-gray-500">No sales found for the selected criteria.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination (Only effective for the main paginated API) -->
+{% if not quick_filter %}
+<div class="flex justify-between items-center mt-6">
+    {% if prev_page %}
+    <a href="?page={{ prev_page }}&search={{ search_query }}&start_date={{ start_date }}&end_date={{ end_date }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">&larr; Previous</a>
+    {% endif %}
+    <span class="text-sm text-gray-600">Page {{ current_page }}</span>
+    {% if next_page %}
+    <a href="?page={{ next_page }}&search={{ search_query }}&start_date={{ start_date }}&end_date={{ end_date }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">Next &rarr;</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
