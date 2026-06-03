@@ -13,15 +13,17 @@ def categories_list(request):
     current_page = request.GET.get('page', 1)
     search_query = request.GET.get('search', '')
     ordering = request.GET.get('ordering', '') # e.g., 'name', '-created_at', 'depth'
+    depth = request.GET.get('depth', '')       # <-- FIX: Capture depth from frontend query parameters
     
     # 2. Build the API parameters dictionary
     api_params = {
         'page': current_page,
         'search': search_query,
         'ordering': ordering,
+        'depth': depth,  
     }
     
-    # Remove keys with empty values so we don't send ?search=&ordering= to the API
+    # Remove keys with empty values so we don't send ?search=&ordering=&depth= to the API
     api_params = {k: v for k, v in api_params.items() if v}
     
     # 3. Construct the clean API URL
@@ -51,7 +53,7 @@ def categories_list(request):
     else:
         messages.error(request, 'Failed to load categories')
     
-    # 5. Pass variables to the template, including the new ordering filter
+    # 5. Pass variables to the template, including the depth filter
     return render(request, 'categories/categories.html', {
         'categories': categories,
         'next_page': next_page,
@@ -60,6 +62,7 @@ def categories_list(request):
         'current_page': current_page,
         'search_query': search_query,
         'ordering': ordering,
+        'depth': depth,       
     })
     
 @login_required_template
@@ -237,9 +240,30 @@ def category_delete(request, id):
 @login_required_template
 def category_tree(request):
     token = request.session.get('token')
-    response = api_call('GET', '/api/categories/tree/', token=token)
-    tree_data = response.json() if response.status_code == 200 else []
-    return render(request, 'categories/category_tree.html', {'tree_data': tree_data})
+    
+    # 1. Capture the selected product type filtering parameter
+    selected_product_type = request.GET.get('product_type', '')
+    
+    tree_data = []
+    
+    # 2. Only request tree hierarchies if a type parameter context exists 
+    if selected_product_type:
+        api_url = f'/api/categories/tree/?product_type={selected_product_type}'
+        response = api_call('GET', api_url, token=token)
+        if response.status_code == 200:
+            tree_data = response.json()
+        else:
+            messages.error(request, 'Failed to load category tree structure.')
+            
+    # 3. Fetch product types so your HTML page can provide a select/dropdown menu
+    pt_response = api_call('GET', '/api/product-types/', token=token)
+    product_types = pt_response.json().get('results', []) if pt_response.status_code == 200 else []
+    
+    return render(request, 'categories/category_tree.html', {
+        'tree_data': tree_data,
+        'product_types': product_types,
+        'selected_product_type': selected_product_type,
+    })
 
 # === Category Roots View ===
 @login_required_template

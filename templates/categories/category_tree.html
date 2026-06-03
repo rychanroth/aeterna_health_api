@@ -1,32 +1,107 @@
 {% extends 'base.html' %}
 
-{% block title %}Category Tree{% endblock %}
-{% block page_title %}Category Tree Structure{% endblock %}
+{% block title %}Category Hierarchy Tree{% endblock %}
+{% block page_title %}Category Hierarchy Tree{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <a href="{% url 'template-category-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to List</a>
-</div>
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 
-<div class="bg-white p-6 rounded shadow">
-    <ul class="space-y-2">
-        {% for cat in tree_data %}
-        <li class="border-b pb-2 flex items-center gap-2" style="padding-left: {{ cat.depth|default:'0' }}2.5rem;">
-            {% if cat.depth == 0 %}
-                <i class='bx bx-folder text-yellow-500 text-xl'></i>
-            {% else %}
-                <i class='bx bx-folder-open text-yellow-600 text-lg'></i>
-            {% endif %}
-            
-            <a href="{% url 'template-category-detail' cat.id %}" class="font-semibold text-gray-800 hover:text-green-700">
-                {{ cat.name }}
+<div class="max-w-4xl mx-auto px-4 py-6">
+    
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-2">
+            <a href="{% url 'template-category-list' %}" class="text-gray-400 hover:text-gray-600 transition p-1.5 rounded-lg hover:bg-gray-100">
+                <i class='bx bx-arrow-back text-xl'></i>
             </a>
-            
-            <span class="text-xs text-gray-400">(Depth: {{ cat.depth }} | Stock: {{ cat.total_stock }})</span>
-        </li>
-        {% empty %}
-        <li class="text-gray-500">No categories found.</li>
-        {% endfor %}
-    </ul>
+            <div>
+                <span class="text-xs font-semibold text-teal-600 tracking-wider uppercase">System Taxonomy</span>
+                <h1 class="text-2xl font-bold text-gray-900">Visual Hierarchy Explorer</h1>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6">
+        <form method="GET" action="" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="space-y-0.5">
+                <label for="product_type" class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Classification Context</label>
+                <p class="text-xs text-gray-400">Select a structural classification to populate its associated functional nodes.</p>
+            </div>
+            <div class="w-full sm:w-72">
+                <select name="product_type" id="product_type" onchange="this.form.submit()" 
+                        class="w-full border border-gray-300 rounded-lg px-3.5 py-2 bg-white text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition">
+                    <option value="">-- Choose Product Type Tree --</option>
+                    {% for pt in product_types %}
+                        <option value="{{ pt.id }}" {% if selected_product_type|stringformat:"s" == pt.id|stringformat:"s" %}selected{% endif %}>
+                            {{ pt.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        
+        {% if not selected_product_type %}
+        <div class="p-12 text-center text-gray-400">
+            <div class="w-16 h-16 bg-gray-50 border border-dashed border-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class='bx bx-git-repo-forked text-2xl text-gray-400 rotate-90'></i>
+            </div>
+            <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-1">No Classification Segment Selected</h3>
+            <p class="text-xs text-gray-400 max-w-sm mx-auto">Please choose an active Product Type from the configuration control panel above to compile its nested tree data layout.</p>
+        </div>
+        
+        {% else %}
+        
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Node Name Hierarchy</span>
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">System Matrix Records</span>
+        </div>
+
+        <ul class="divide-y divide-gray-100">
+            {% for cat in tree_data %}
+            <li class="hover:bg-gray-50/60 transition group flex items-center justify-between py-3.5 px-6" 
+                style="padding-left: calc(1.5rem + ({{ cat.depth|default:'0' }} * 2rem));">
+                
+                <div class="flex items-center gap-3 relative">
+                    {% if cat.depth > 0 %}
+                    <span class="absolute -left-4 top-1/2 -translate-y-1/2 w-2.5 h-2.5 border-l-2 border-b-2 border-gray-200 rounded-bl"></span>
+                    {% endif %}
+
+                    <div class="flex items-center justify-center">
+                        {% if cat.depth == 0 %}
+                            <i class='bx bxs-folder-open text-amber-500 text-xl shadow-sm'></i>
+                        {% elif cat.depth == 1 %}
+                            <i class='bx bx-folder-open text-teal-500 text-lg'></i>
+                        {% else %}
+                            <i class='bx bx-git-branch text-purple-400 text-base rotate-180'></i>
+                        {% endif %}
+                    </div>
+                    
+                    <a href="{% url 'template-category-detail' cat.id %}" 
+                       class="font-semibold text-sm text-gray-800 hover:text-teal-600 transition tracking-wide">
+                        {{ cat.name }}
+                    </a>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 border border-gray-200/60">
+                        Depth Level {{ cat.depth }}
+                    </span>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold {% if cat.total_stock > 0 %}bg-emerald-50 text-emerald-700 border border-emerald-200/40{% else %}bg-gray-100 text-gray-400 border border-gray-200/40{% endif %}">
+                        <i class='bx bx-package text-xs'></i>
+                        {{ cat.total_stock|default:"0" }} <span class="font-normal text-[10px] uppercase text-gray-400 ml-0.5">Units</span>
+                    </span>
+                </div>
+            </li>
+            {% empty %}
+            <div class="p-12 text-center text-gray-400">
+                <i class='bx bx-folder text-4xl mb-2 text-gray-300'></i>
+                <p class="text-xs font-semibold text-gray-500">No category hierarchies mapped to this classification path yet.</p>
+            </div>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
