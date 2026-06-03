@@ -4,127 +4,263 @@
 {% block page_title %}Stock Ledger{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-6">
-    <p class="text-sm text-gray-500">Total Records: {{ count }}</p>
-    <!-- Create button will be added in M5.3 -->
-</div>
+<div x-data="{ 
+    showFilters: false, 
+    openDrawer: false, 
+    detail: { date: '', product: '', type: '', is_in: true, qty: '', ref: '', notes: '' } 
+}" class="relative antialiased">
 
-<!-- Filter Bar -->
-<form method="GET" action="{% url 'template-stock-movement-list' %}" class="mb-6 bg-white p-4 rounded shadow">
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-        
-        <!-- Direction Filter -->
-        <div>
-            <label class="block text-xs text-gray-600 mb-1">Direction</label>
-            <select name="direction" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
-                <option value="">All</option>
-                <option value="in" {% if direction == 'in' %}selected{% endif %}>Stock In</option>
-                <option value="out" {% if direction == 'out' %}selected{% endif %}>Stock Out</option>
-            </select>
-        </div>
-
-        <!-- Product Filter -->
-        <div>
-            <label class="block text-xs text-gray-600 mb-1">Product</label>
-            <select name="product" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
-                <option value="">All Products</option>
-                {% for prod in products %}
-                <option value="{{ prod.id }}" {% if product_id|stringformat:"s" == prod.id|stringformat:"s" %}selected{% endif %}>
-                    {{ prod.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Start Date -->
-        <div>
-            <label class="block text-xs text-gray-600 mb-1">Start Date</label>
-            <input type="date" name="start_date" value="{{ start_date }}" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
-        </div>
-
-        <!-- End Date -->
-        <div>
-            <label class="block text-xs text-gray-600 mb-1">End Date</label>
-            <input type="date" name="end_date" value="{{ end_date }}" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
-        </div>
-
-        <div class="flex gap-2">
-            <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 w-full">Filter</button>
-            <a href="{% url 'template-stock-movement-list' %}" class="bg-gray-200 text-gray-700 px-3 py-2 rounded hover:bg-gray-300 text-center" title="Clear Filters">
-                <i class='bx bx-x'></i>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div class="flex items-center gap-3">
+            <p class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">Total Records: {{ count }}
+            </p>
+            <a href="{% url 'template-stock-movement-summary' %}"
+                class="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg font-medium text-sm flex items-center gap-1.5 hover:bg-emerald-100 transition-colors shadow-sm">
+                <i class='bx bx-bar-chart-alt-2 text-base'></i> View Summary
             </a>
         </div>
+
+        <button @click="showFilters = !showFilters"
+            class="w-full sm:w-auto bg-white border border-slate-200 text-slate-700 px-4 py-1.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors shadow-sm">
+            <i class='bx bx-filter-alt text-base text-emerald-600'></i>
+            <span x-text="showFilters ? 'Hide Filters' : 'Show Filters'">Show Filters</span>
+        </button>
     </div>
-</form>
 
-<!-- Ledger Table -->
-<div class="bg-white rounded shadow overflow-hidden">
-    <table class="w-full text-left border-collapse">
-        <thead>
-            <tr class="bg-gray-800 text-white text-sm">
-                <th class="p-3">Date</th>
-                <th class="p-3">Product</th>
-                <th class="p-3">Reason</th>
-                <th class="p-3">Direction</th>
-                <th class="p-3">Quantity</th>
-                <th class="p-3">Supplier / Sale</th>
-                <th class="p-3">Recorded By</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for mov in movements %}
-            <tr class="border-b hover:bg-gray-50 text-sm">
-                <td class="p-3 text-gray-600 text-xs">{{ mov.created_at|date:"M d, Y h:i A" }}</td>
-                <td class="p-3 font-semibold text-gray-800">{{ mov.product_name }}</td>
-                <td class="p-3 text-gray-600">{{ mov.get_movement_type_display|default:mov.movement_type }}</td>
-                
-                <!-- Direction Badge -->
-                <td class="p-3">
-                    {% if mov.is_stock_in %}
-                    <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded flex items-center gap-1 w-max">
-                        <i class='bx bx-log-in'></i> IN
-                    </span>
-                    {% else %}
-                    <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded flex items-center gap-1 w-max">
-                        <i class='bx bx-log-out'></i> OUT
-                    </span>
-                    {% endif %}
-                </td>
+    <div x-show="showFilters" x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 -translate-y-2"
+        class="mb-6 bg-white p-5 rounded-xl border border-slate-100 shadow-sm" style="display: none;">
 
-                <!-- Quantity (Color coded by direction) -->
-                <td class="p-3 font-bold {% if mov.is_stock_in %}text-green-600{% else %}text-red-600{% endif %}">
-                    {% if mov.is_stock_in %}+{% else %}-{% endif %}{{ mov.quantity }}
-                </td>
+        <form method="GET" action="{% url 'template-stock-movement-list' %}">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Search</label>
+                    <input type="text" name="search" value="{{ search_query }}" placeholder="Reference, Notes..."
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                </div>
 
-                <td class="p-3 text-gray-600 text-xs">
-                    {% if mov.supplier_name %} 
-                        <span class="text-blue-600">{{ mov.supplier_name }}</span> 
-                    {% elif mov.sale_number %} 
-                        Sale #{{ mov.sale_number }}
-                    {% else %}
-                        <span class="text-gray-400">-</span>
-                    {% endif %}
-                </td>
-                
-                <td class="p-3 text-gray-500 text-xs">{{ mov.created_by_name|default:"System" }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" class="p-4 text-center text-gray-500">No stock movements found for the selected filters.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Direction</label>
+                    <select name="direction"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                        <option value="">All Transactions</option>
+                        <option value="in" {% if direction == 'in' %}selected{% endif %}>Stock In</option>
+                        <option value="out" {% if direction == 'out' %}selected{% endif %}>Stock Out</option>
+                    </select>
+                </div>
 
-<!-- Pagination -->
-<div class="flex justify-between items-center mt-6">
-    {% if prev_page %}
-    <a href="?page={{ prev_page }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">&larr; Previous</a>
-    {% endif %}
-    <span class="text-sm text-gray-600">Page {{ current_page }}</span>
-    {% if next_page %}
-    <a href="?page={{ next_page }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}" class="bg-white border px-4 py-2 rounded shadow hover:bg-gray-50">Next &rarr;</a>
-    {% endif %}
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Product</label>
+                    <select name="product"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                        <option value="">All Products</option>
+                        {% for prod in products %}
+                        <option value="{{ prod.id }}" {% if product_id|stringformat:"s" == prod.id|stringformat:"s" %}selected{% endif %}>{{ prod.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Start Date</label>
+                    <input type="date" name="start_date" value="{{ start_date }}"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">End Date</label>
+                    <input type="date" name="end_date" value="{{ end_date }}"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+                <a href="{% url 'template-stock-movement-list' %}"
+                    class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors flex items-center justify-center"
+                    title="Reset Filters">Clear All</a>
+                <button type="submit"
+                    class="bg-emerald-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm">Apply
+                    Filters</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-emerald-900 text-emerald-50 text-xs font-semibold uppercase tracking-wider">
+                        <th class="p-3.5">Date</th>
+                        <th class="p-3.5">Product</th>
+                        <th class="p-3.5">Reason</th>
+                        <th class="p-3.5">Direction</th>
+                        <th class="p-3.5">Quantity</th>
+                        <th class="p-3.5">Reference / Notes</th>
+                        <th class="p-3.5 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for mov in movements %}
+                    <tr class="hover:bg-slate-50/70 transition-colors text-sm group">
+                        <td class="p-3.5 text-slate-500 font-medium text-xs whitespace-nowrap">{{ mov.created_at|date:"M d, Y h:i A" }}</td>
+                        <td class="p-3.5 font-semibold text-slate-800">{{ mov.product_name }}</td>
+                        <td class="p-3.5 text-slate-600">{{ mov.get_movement_type_display|default:mov.movement_type }}
+                        </td>
+
+                        <td class="p-3.5">
+                            {% if mov.is_stock_in %}
+                            <span
+                                class="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2 py-1 rounded-md inline-flex items-center gap-1"><i
+                                    class='bx bx-log-in text-sm'></i> IN</span>
+                            {% else %}
+                            <span
+                                class="bg-rose-50 text-rose-700 text-xs font-semibold px-2 py-1 rounded-md inline-flex items-center gap-1"><i
+                                    class='bx bx-log-out text-sm'></i> OUT</span>
+                            {% endif %}
+                        </td>
+
+                        <td
+                            class="p-3.5 font-bold {% if mov.is_stock_in %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                            {% if mov.is_stock_in %}+{% else %}-{% endif %}{{ mov.quantity }}
+                        </td>
+
+                        <td class="p-3.5 text-slate-500 text-xs truncate max-w-[200px]">{{ mov.reference|default:mov.notes|default:"—" }}</td>
+
+                        <td class="p-3.5 text-center">
+                            <a href="{% url 'template-stock-movement-detail' mov.id %}" 
+                            class="text-emerald-600 hover:text-emerald-800 p-1.5 rounded-md hover:bg-emerald-50 transition-colors inline-flex items-center" 
+                            title="Open Details in New Tab">
+                                <i class='bx bx-link-external text-xl'></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-slate-400 font-medium">No recorded movements found
+                            matching the active workspace filter.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="flex justify-between items-center mt-5">
+        {% if prev_page %}
+        <a href="?page={{ prev_page }}&search={{ search_query }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}"
+            class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg shadow-sm text-sm font-medium hover:bg-slate-50 transition-colors">&larr;
+            Previous</a>
+        {% else %}
+        <div></div>
+        {% endif %}
+
+        <span
+            class="text-xs font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-md shadow-sm">Page
+            {{ current_page }}</span>
+
+        {% if next_page %}
+        <a href="?page={{ next_page }}&search={{ search_query }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}"
+            class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg shadow-sm text-sm font-medium hover:bg-slate-50 transition-colors">Next
+            &rarr;</a>
+        {% else %}
+        <div></div>
+        {% endif %}
+    </div>
+
+    <div x-show="openDrawer" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" role="dialog"
+        aria-modal="true">
+        <div class="absolute inset-0 overflow-hidden">
+            <div x-show="openDrawer" x-transition:enter="ease-in-out duration-300" x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100" x-transition:leave="ease-in-out duration-200"
+                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="openDrawer = false"
+                class="absolute inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"></div>
+
+            <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+                <div x-show="openDrawer"
+                    x-transition:enter="transform transition ease-in-out duration-300 sm:duration-400"
+                    x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                    x-transition:leave="transform transition ease-in-out duration-300"
+                    x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+                    class="pointer-events-auto w-screen max-w-md bg-white shadow-2xl border-l border-slate-100 flex flex-col">
+
+                    <div class="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <i class='bx bx-receipt text-emerald-600 text-xl'></i> Movement Details
+                        </h3>
+                        <button @click="openDrawer = false"
+                            class="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-200/60 rounded-md transition-colors">
+                            <i class='bx bx-x text-2xl'></i>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-6 space-y-5">
+                        <div class="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100/50">
+                            <label
+                                class="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-0.5">Product</label>
+                            <p class="text-lg font-bold text-emerald-950" x-text="detail.product"></p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-0.5">Timestamp</label>
+                                <p class="text-sm font-medium text-slate-800" x-text="detail.date"></p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-0.5">Reason Category</label>
+                                <p class="text-sm font-medium text-slate-800" x-text="detail.type"></p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 pt-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-0.5">Direction Type</label>
+                                <template x-if="detail.is_in">
+                                    <span
+                                        class="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"><i
+                                            class='bx bx-log-in'></i> IN</span>
+                                </template>
+                                <template x-if="!detail.is_in">
+                                    <span
+                                        class="bg-rose-50 text-rose-700 text-xs font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"><i
+                                            class='bx bx-log-out'></i> OUT</span>
+                                </template>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-0.5">Quantity
+                                    Velocity</label>
+                                <p class="text-base font-bold"
+                                    :class="detail.is_in ? 'text-emerald-600' : 'text-rose-600'">
+                                    <span x-text="detail.is_in ? '+' : '-'"></span><span x-text="detail.qty"></span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-100">
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">System Reference</label>
+                            <p class="text-sm bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-slate-700 font-mono text-xs"
+                                x-text="detail.ref"></p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">Internal Log Notes</label>
+                            <div class="text-sm bg-slate-50 border border-slate-100 p-3 rounded-lg text-slate-700 whitespace-pre-wrap leading-relaxed"
+                                x-text="detail.notes"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-t border-slate-100 bg-slate-50 text-right">
+                        <button type="button" @click="openDrawer = false"
+                            class="bg-slate-800 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-slate-900 transition-colors shadow-sm w-full sm:w-auto">Dismiss
+                            View</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}

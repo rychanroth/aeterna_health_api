@@ -10,6 +10,7 @@ from drf_spectacular.utils import extend_schema, inline_serializer
 class StockMovementViewSet(viewsets.ModelViewSet):
     queryset = StockMovement.objects.all()
     serializer_class = StockMovementSerializer
+    search_fields = ['product__name', 'supplier', 'reference']
 
     def get_permissions(self):
         if self.action == 'create':
