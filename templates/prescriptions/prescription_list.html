@@ -54,8 +54,12 @@
                     {% endif %}
                 </td>
                 <td class="p-3">
-                    <div class="flex items-center">
+                    <div class="flex items-center gap-3">
                         <a href="{% url 'template-prescription-detail' rx.id %}" title="View" class="text-blue-600 hover:text-blue-800"><i class='bx bx-show text-lg'></i></a>
+                        
+                        {% if rx.status == 'verified' %}
+                        <a href="{% url 'template-prescription-dispense' rx.id %}" title="Dispense Prescription" class="text-purple-600 hover:text-purple-800"><i class='bx bx-cart text-lg'></i></a>
+                        {% endif %}
                     </div>
                 </td>
             </tr>

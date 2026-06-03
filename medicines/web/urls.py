@@ -58,6 +58,7 @@ urlpatterns = [
     path('prescriptions/<int:id>/', prescription_detail, name='template-prescription-detail'),
     path('prescriptions/<int:id>/verify/', prescription_verify, name='template-prescription-verify'),
     path('prescriptions/<int:id>/reject/', prescription_reject, name='template-prescription-reject'),
+    path('prescriptions/<int:id>/dispense', prescription_dispense, name='template-prescription-dispense'),
 
     # SALES
     path('sales', sale_list, name='template-sale-list'),
