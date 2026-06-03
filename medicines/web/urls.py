@@ -66,6 +66,13 @@ urlpatterns = [
 
     # POS
     path('pos/', pos_screen, name='template-pos-screen'),
+
+    # USER
+    path('users/', user_list, name='template-user-list'),
+    path('users/create/', user_create, name='template-user-create'),
+    path('users/<int:id>/edit/', user_edit, name='template-user-edit'),
+    path('users/<int:id>/delete/', user_delete, name='template-user-delete'),
+    path('users/me/', user_me, name='template-user-me'),
 ]
 
 # By default, Django's development server refuses to serve media files.

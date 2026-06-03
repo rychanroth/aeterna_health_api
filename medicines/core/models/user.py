@@ -14,7 +14,7 @@ class User(AbstractUser):
         default=Role.ADMIN
     )
     username = models.CharField(max_length=150, unique=True, verbose_name="User Name")
-    first_name = models.CharField(max_length=150, verbose_name="First Name", default="first`")
+    first_name = models.CharField(max_length=150, verbose_name="First Name", default="first")
     last_name = models.CharField(max_length=150, verbose_name="Last Name", default="last")
     image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True)
