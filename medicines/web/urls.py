@@ -51,6 +51,13 @@ urlpatterns = [
     path('stock-movements/summary/', stock_movement_summary, name='template-stock-movement-summary'),
     # path('stock-movements/create/', stoc    k_movement_create, name='template-stock-movement-create'),
     path('stock-movements/<int:id>/', stock_movement_detail, name='template-stock-movement-detail'),
+
+    # PRESCRIPTION
+    path('prescriptions/', prescription_list, name='template-prescription-list'),
+    path('prescriptions/create/', prescription_create, name='template-prescription-create'),
+    path('prescriptions/<int:id>/', prescription_detail, name='template-prescription-detail'),
+    path('prescriptions/<int:id>/verify/', prescription_verify, name='template-prescription-verify'),
+    path('prescriptions/<int:id>/reject/', prescription_reject, name='template-prescription-reject'),
 ]
 
 # By default, Django's development server refuses to serve media files.

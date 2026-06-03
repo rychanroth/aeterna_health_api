@@ -6,3 +6,4 @@ from .supplier import *
 from .doctor import *
 from .patient import *
 from .stock_movement import *
+from .prescription import *
