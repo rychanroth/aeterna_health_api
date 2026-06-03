@@ -4,5 +4,5 @@ from medicines.core.models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'phone']
+        fields = ['id', 'image', 'username', 'first_name', 'last_name', 'role', 'phone']
         read_only_fields = ['id']

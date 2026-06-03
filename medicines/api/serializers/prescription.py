@@ -4,6 +4,11 @@ from medicines.core.models import Prescription, PrescriptionItem, Product, Docto
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
+    
+    # For reading the ID in GET responses
+    product = serializers.PrimaryKeyRelatedField(read_only=True) 
+    
+    # For writing the ID in POST/PATCH requests
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(),
         source='product',
@@ -13,10 +18,10 @@ class PrescriptionItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PrescriptionItem
         fields = [
-            'id', 'product_name', 'product_id',
+            'id', 'product_name', 'product_id', 'product',
             'quantity_prescribed', 'dosage_instructions', 'is_dispensed'
         ]
-        read_only_fields = ['id', 'is_dispensed']
+        read_only_fields = ['id', 'is_dispensed', 'product']
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     items = PrescriptionItemSerializer(many=True)
