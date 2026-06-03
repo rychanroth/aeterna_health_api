@@ -371,6 +371,8 @@
     <script>
         function posApp() {
             return {
+                token: "{{ request.session.token }}",
+
                 searchQuery: '',
                 filteredProducts: [],
                 isLoading: false,
@@ -432,12 +434,22 @@
                 async searchProducts() {
                     this.isLoading = true;
                     try {
-                        // Default search or targeted search
                         const url = this.searchQuery.length > 0 
                             ? `/api/products/?search=${this.searchQuery}&page_size=30`
-                            : `/api/products/?page_size=20`; // Load initial 20 on empty
+                            : `/api/products/?page_size=20`;
                             
-                        const res = await fetch(url, {credentials: 'include'});
+                        // Build the headers dynamically
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (this.token) {
+                            // Change 'Token' to 'Bearer' if you are using JWT instead of DRF Authtoken
+                            headers['Authorization'] = `Token ${this.token}`; 
+                        }
+
+                        const res = await fetch(url, {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: headers // <-- Pass the headers here
+                        });
                         const data = await res.json();
                         this.filteredProducts = data.results || [];
                     } catch (e) {
@@ -519,13 +531,18 @@
 
                     try {
                         const csrftoken = getCookie('csrftoken');
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        };
+                        if (this.token) {
+                            headers['Authorization'] = `Token ${this.token}`;
+                        }
+
                         const res = await fetch('/api/sales/checkout/', {
                             method: 'POST',
                             credentials: 'include',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrftoken
-                            },
+                            headers: headers,
                             body: JSON.stringify(payload)
                         });
                         const data = await res.json();
