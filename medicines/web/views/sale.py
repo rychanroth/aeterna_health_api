@@ -62,5 +62,21 @@ def sale_list(request):
         'quick_filter': quick_filter,
     })
 
+@login_required_template
 def sale_detail(request, id):
-    pass
+    token = request.session.get('token')
+    response = api_call('GET', f'/api/sales/{id}/', token=token)
+    
+    if response.status_code == 404:
+        messages.error(request, 'Sale record not found.')
+        return redirect('template-sale-list')
+    if response.status_code != 200:
+        messages.error(request, 'Failed to load sale details.')
+        return redirect('template-sale-list')
+        
+    sale = response.json()
+    # Parse the ISO 8601 date string for template rendering
+    if sale.get('created_at'):
+        sale['created_at'] = parse_datetime(sale['created_at'])
+        
+    return render(request, 'sales/sale_detail.html', {'sale': sale})
