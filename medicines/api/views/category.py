@@ -114,21 +114,31 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response({'moved': moved, 'errors': errors})
     
     def get_queryset(self):
-        queryset = Category.objects.all()
+        # Best practice: use super().get_queryset() to preserve viewset definitions
+        queryset = super().get_queryset()
+        
         product_type_id = self.request.query_params.get('product_type')
         if product_type_id:
             queryset = queryset.filter(product_type_id=product_type_id)
+            
+        # Refactored: Queryset now handles depth filtering directly at the database layer
         depth = self.request.query_params.get('depth')
         if depth:
-            category_ids = [c.id for c in Category.objects.all() if c.depth == int(depth)]
-            queryset = queryset.filter(id__in=category_ids)
+            try:
+                queryset = queryset.filter(depth=int(depth))
+            except ValueError:
+                # Fallback to an empty queryset if depth param is an invalid format (e.g. text)
+                queryset = queryset.none()
+                
         parent_id = self.request.query_params.get('parent')
         if parent_id:
             if parent_id == 'null':
                 queryset = queryset.filter(parent__isnull=True)
             else:
                 queryset = queryset.filter(parent_id=parent_id)
+                
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
         return queryset

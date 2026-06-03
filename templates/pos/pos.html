@@ -89,7 +89,7 @@
                                     <img :src="prod.image" class="w-full h-full object-contain" alt="Product Image">
                                 </template>
                                 <template x-if="!prod.image">
-                                    <i class='bx bx-capsule text-3xl text-gray-300'></i>
+                                    <i class='bx bx-plus-medical text-3xl text-gray-300'></i>
                                 </template>
                             </div>
 
@@ -150,7 +150,7 @@
                                     <img :src="selectedProduct.image" class="w-full h-full object-contain" alt="Product Image">
                                 </template>
                                 <template x-if="!selectedProduct.image">
-                                    <i class='bx bx-capsule text-7xl text-gray-300'></i>
+                                    <i class='bx bx-plus-medical text-7xl text-gray-300'></i>
                                 </template>
                                 
                                 <span x-show="selectedProduct.effective_requires_prescription" class="absolute top-3 left-3 bg-purple-100 text-purple-700 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm uppercase tracking-wider flex items-center gap-1">

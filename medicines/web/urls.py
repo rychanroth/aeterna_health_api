@@ -8,6 +8,9 @@ urlpatterns = [
     path('login/', login_page, name='template-login'),
     path('logout/', logout_view, name='template-logout'),
 
+    # REPORT
+    path('reports/', reports_dashboard, name='template-reports-dashboard'),
+
     # CATEGORYs
     path('categories/', categories_list, name='template-category-list'),
     path('categories/create/', category_create, name='template-category-create'),

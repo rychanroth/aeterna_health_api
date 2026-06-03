@@ -111,4 +111,23 @@ class ReportViewSet(viewsets.ViewSet):
         expired = Product.objects.filter(expiration_date__lt=timezone.now().date(), is_active=True).values('id', 'name', 'expiration_date', 'stock_quantity', 'product_type__name')
         return Response({'low_stock': list(low_stock), 'expiring_soon': list(expiring_soon), 'expired': list(expired), 'thresholds': {'low_stock': low_threshold, 'expiry_days': days_ahead}})
 
-    # ... prescription_stats, monthly_revenue, product_type_breakdown remain exactly the same ...
+    @extend_schema(responses=inline_serializer(name='PrescriptionStatsResponse', fields={'status_breakdown': serializers.ListField(child=serializers.DictField()), 'recent_pending': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def prescription_stats(self, request):
+        stats = Prescription.objects.values('status').annotate(count=Count('id')).order_by('status')
+        pending_recent = Prescription.objects.filter(status=Prescription.Status.PENDING).order_by('-created_at')[:10].values('id', 'prescription_number', 'created_at', 'doctor__name', 'patient__name')
+        return Response({'status_breakdown': list(stats), 'recent_pending': list(pending_recent)})
+
+    @extend_schema(responses=inline_serializer(name='MonthlyRevenueResponse', fields={'year': serializers.IntegerField(), 'monthly_data': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def monthly_revenue(self, request):
+        year = safe_int(request.query_params.get('year'), timezone.now().year)
+        monthly = Sale.objects.filter(created_at__year=year).annotate(month=TruncMonth('created_at')).values('month').annotate(sales_count=Count('id'), revenue=Sum('total_amount')).order_by('month')
+        return Response({'year': year, 'monthly_data': list(monthly)})
+
+    @extend_schema(responses=inline_serializer(name='ProductTypeBreakdownResponse', fields={'inventory_by_type': serializers.ListField(child=serializers.DictField()), 'sales_by_type': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def product_type_breakdown(self, request):
+        by_type = Product.objects.filter(is_active=True).values('product_type__id', 'product_type__name').annotate(product_count=Count('id'), total_stock=Sum('stock_quantity'), total_value=Sum(F('stock_quantity') * F('selling_price')), low_stock_count=Count('id', filter=Q(stock_quantity__lt=10)), expired_count=Count('id', filter=Q(expiration_date__lt=timezone.now().date()))).order_by('product_type__name')
+        sales_by_type = SaleItem.objects.values('product__product_type__id', 'product__product_type__name').annotate(items_sold=Sum('quantity'), revenue=Sum('subtotal')).order_by('-revenue')
+        return Response({'inventory_by_type': list(by_type), 'sales_by_type': list(sales_by_type)})
