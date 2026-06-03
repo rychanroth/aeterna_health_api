@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Product: {{ product.name }}{% endblock %}
+{% block page_title %}Product Details{% endblock %}
+
+{% block content %}
+<div class="mb-4"><a href="{% url 'template-product-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Products</a></div>
+
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">{{ product.name }}</h2>
+    <div class="flex items-center gap-3">
+        <a href="{% url 'template-product-edit' product.id %}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow text-sm flex items-center gap-1"><i class='bx bx-edit'></i> Edit</a>
+        <form method="POST" action="{% url 'template-product-delete' product.id %}" onsubmit="return confirm('Delete?');">
+            {% csrf_token %}<input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow text-sm flex items-center gap-1"><i class='bx bx-trash'></i> Delete</button>
+        </form>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white p-6 rounded shadow col-span-1">
+        {% if product.image %}<img src="{{ product.image }}" class="w-full h-48 object-cover rounded">{% else %}<div class="w-full h-48 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-5xl"><i class="bx bx-image"></i></div>{% endif %}
+    </div>
+    <div class="bg-white p-6 rounded shadow col-span-2 space-y-4 text-sm">
+        <div class="flex gap-4 border-b pb-4">
+            <div class="flex-1"><p class="text-gray-500">Category</p><p class="font-bold text-gray-800">{{ product.category.name|default:"-" }}</p></div>
+            <div class="flex-1"><p class="text-gray-500">Product Type</p><p class="font-bold text-gray-800">{{ product.product_type.name|default:"-" }}</p></div>
+            <div class="flex-1"><p class="text-gray-500">Base Unit</p><p class="font-bold text-gray-800 capitalize">{{ product.base_unit }}</p></div>
+        </div>
+        <div class="flex gap-4 border-b pb-4">
+            <div class="flex-1"><p class="text-gray-500">Selling Price</p><p class="font-bold text-2xl text-green-700">$ {{ product.selling_price }}</p></div>
+            <div class="flex-1"><p class="text-gray-500">Stock Quantity</p>
+                <p class="font-bold text-2xl {% if product.is_low_stock %}text-yellow-600{% else %}text-gray-800{% endif %}">{{ product.stock_quantity }}</p>
+            </div>
+        </div>
+        <div class="flex gap-4 items-center">
+            <div>
+                <p class="text-gray-500 mb-1">Status Flags</p>
+                <div class="flex gap-2">
+                    {% if product.is_expired %}<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded font-bold">EXPIRED</span>{% endif %}
+                    {% if product.effective_requires_prescription %}<span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded font-bold">Rx REQUIRED</span>{% endif %}
+                    {% if product.is_low_stock %}<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded font-bold">LOW STOCK</span>{% endif %}
+                    {% if product.is_active %}<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Active</span>{% else %}<span class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">Inactive</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 gap-6">
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="font-bold text-gray-800 mb-2">Description</h3>
+        <p class="text-sm text-gray-600">{{ product.description|default:"No description provided." }}</p>
+    </div>
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="font-bold text-gray-800 mb-2">Suppliers</h3>
+        {% if product.suppliers %}
+        <ul class="space-y-1 text-sm text-gray-600">
+            {% for sup in product.suppliers %}<li class="flex items-center gap-2"><i class='bx bx-package text-gray-400'></i> {{ sup.name }}</li>{% endfor %}
+        </ul>
+        {% else %}<p class="text-sm text-gray-500">No suppliers assigned.</p>{% endif %}
+    </div>
+</div>
+{% endblock %}

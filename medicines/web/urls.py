@@ -52,6 +52,13 @@ urlpatterns = [
     # path('stock-movements/create/', stoc    k_movement_create, name='template-stock-movement-create'),
     path('stock-movements/<int:id>/', stock_movement_detail, name='template-stock-movement-detail'),
 
+    # PRODUCT
+    path('products/', product_list, name='template-product-list'),
+    path('products/create/', product_create, name='template-product-create'),
+    path('products/<int:id>/', product_detail, name='template-product-detail'),
+    path('products/<int:id>/edit/', product_edit, name='template-product-edit'),
+    path('products/<int:id>/delete/', product_delete, name='template-product-delete'),
+
     # PRESCRIPTION
     path('prescriptions/', prescription_list, name='template-prescription-list'),
     path('prescriptions/create/', prescription_create, name='template-prescription-create'),

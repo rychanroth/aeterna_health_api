@@ -22,7 +22,7 @@
 
             {% if request.session.role == 'admin' %}
             <div class="text-xs text-gray-400 uppercase mt-4 mb-2">Admin Only</div>
-            <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Users</a>
+            <a href="{% url 'template-user-list' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Users</a>
             <a href="{% url 'template-supplier-list' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Suppliers</a>
             <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Reports</a>
             {% endif %}
@@ -37,7 +37,7 @@
             <div class="text-xs text-gray-400 uppercase mt-4 mb-2">Inventory</div>
             <a href="{% url 'template-product-type-list' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Product Types</a>
             <a href="{% url 'template-category-list' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Categories</a>
-            <a href="#" class="block py-2 px-3 rounded hover:bg-gray-700">Products</a>
+            <a href="{% url 'template-product-list' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Products</a>
 
             <div class="text-xs text-gray-400 uppercase mt-4 mb-2">Clinical</div>
             <a href="{% url 'template-prescription-list' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Prescriptions</a>

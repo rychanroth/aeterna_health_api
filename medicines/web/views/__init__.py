@@ -10,3 +10,4 @@ from .prescription import *
 from .sale import *
 from .pos import *
 from .user import *
+from .product import *
