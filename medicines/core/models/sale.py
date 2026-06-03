@@ -1,8 +1,18 @@
 import datetime
+import string
+import secrets
 from decimal import Decimal
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from .abstracts import CoreAbstractModel
+
+def generate_sale_number():
+    """Generate a unique Sale number like: SL-20260603-X9Y8"""
+    today_str = datetime.date.today().strftime('%Y%m%d')
+    chars = string.ascii_uppercase + string.digits
+    # FIX: Use secrets.choice() in a comprehension
+    random_str = ''.join(secrets.choice(chars) for _ in range(4))
+    return f"SL-{today_str}-{random_str}"
 
 class Sale(CoreAbstractModel):
     class PaymentMethod(models.TextChoices):
@@ -10,7 +20,7 @@ class Sale(CoreAbstractModel):
         CARD = 'card', 'Card'
         INSURANCE = 'insurance', 'Insurance'
 
-    sale_number = models.CharField(max_length=30, unique=True)
+    sale_number = models.CharField(max_length=30, unique=True, default=generate_sale_number)
     cashier = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, related_name='sales')
     prescription = models.ForeignKey('Prescription', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -28,16 +38,7 @@ class Sale(CoreAbstractModel):
         return sum(item.subtotal for item in self.items.all())
 
     def save(self, *args, **kwargs):
-        # CONSTRAINT ENFORCEMENT: Cannot update a sale audit trail
-        if self.pk is not None:
-            raise ValidationError("Sales are immutable audit trails and cannot be updated. Please void and create a new one if correction is needed.")
-        
-        # Auto-generate sale number on creation
-        if not self.pk:
-            today = datetime.date.today()
-            count = Sale.objects.filter(created_at__date=today).count() + 1
-            self.sale_number = f"SL-{today.strftime('%Y%m%d')}-{count:04d}"
-            
+        # Sale number is handled by the field default. No manual generation needed!
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
