@@ -82,38 +82,37 @@
                                 :class="(!prod.is_active || prod.is_expired || prod.effective_requires_prescription || prod.requires_prescription || prod.stock_quantity <= 0) 
                                     ? 'opacity-60 bg-gray-100 cursor-not-allowed border-gray-200' 
                                     : 'bg-white hover:border-teal-500 hover:shadow-md cursor-pointer'"
-                                class="p-4 rounded-xl border border-gray-200 transition-all text-left flex flex-col justify-between h-32 relative overflow-hidden group">
+                                class="p-3 rounded-xl border border-gray-200 transition-all text-left flex gap-3 h-36 relative overflow-hidden group">
                             
-                            <div class="w-full">
-                                <div class="flex justify-between items-start mb-1 gap-2">
-                                    <p class="font-semibold text-sm text-gray-800 leading-tight group-hover:text-teal-700 transition-colors line-clamp-2" x-text="prod.name"></p>
-                                    
-                                    <div class="flex flex-col gap-1 items-end shrink-0">
-                                        <span x-show="!prod.is_active" 
-                                            class="text-[9px] font-extrabold text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
-                                            Inactive
-                                        </span>
-                                        
-                                        <span x-show="prod.is_expired" 
-                                            class="text-[9px] font-extrabold text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
-                                            Expired
-                                        </span>
-                                        
-                                        <span x-show="prod.effective_requires_prescription || prod.requires_prescription" 
-                                            class="text-[9px] font-extrabold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
-                                            Rx Required
-                                        </span>
-
-                                        <span x-show="prod.stock_quantity <= 0 && prod.is_active && !prod.is_expired" 
-                                            class="text-[9px] font-extrabold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
-                                            Out of Stock
-                                        </span>
-                                    </div>
-                                </div>
-                                <p class="text-xs text-gray-500" x-text="prod.base_unit"></p>
+                            <div class="w-[90px] h-[90px] shrink-0 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden relative">
+                                <template x-if="prod.image">
+                                    <img :src="prod.image" class="w-full h-full object-contain" alt="Product Image">
+                                </template>
+                                <template x-if="!prod.image">
+                                    <i class='bx bx-capsule text-3xl text-gray-300'></i>
+                                </template>
                             </div>
-                            
-                            <p class="text-teal-700 font-extrabold text-lg shrink-0 mt-2" x-text="'$' + parseFloat(prod.selling_price).toFixed(2)"></p>
+
+                            <div class="flex-1 flex flex-col justify-between h-full overflow-hidden">
+                                <div class="w-full">
+                                    <div class="flex justify-between items-start gap-1">
+                                        <p class="font-semibold text-sm text-gray-800 leading-tight group-hover:text-teal-700 transition-colors line-clamp-2" x-text="prod.name"></p>
+                                        
+                                        <div class="flex flex-col gap-0.5 items-end shrink-0">
+                                            <span x-show="!prod.is_active" class="text-[8px] font-extrabold text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Inactive</span>
+                                            <span x-show="prod.is_expired" class="text-[8px] font-extrabold text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Expired</span>
+                                            <span x-show="prod.effective_requires_prescription || prod.requires_prescription" class="text-[8px] font-extrabold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Rx</span>
+                                            <span x-show="prod.stock_quantity <= 0 && prod.is_active && !prod.is_expired" class="text-[8px] font-extrabold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">OUT</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-400 mt-0.5" x-text="prod.base_unit"></p>
+                                </div>
+                                
+                                <div class="flex justify-between items-end mt-auto">
+                                    <p class="text-teal-700 font-extrabold text-base" x-text="'$' + parseFloat(prod.selling_price).toFixed(2)"></p>
+                                    <p class="text-[10px] text-gray-400 font-medium" x-text="prod.stock_quantity + ' left'"></p>
+                                </div>
+                            </div>
                         </button>
                     </template>
                 </div>
