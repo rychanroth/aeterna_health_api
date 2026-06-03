@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db import transaction
 from medicines.core.models import Prescription, PrescriptionItem, Product, Doctor, Patient
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
@@ -12,7 +13,7 @@ class PrescriptionItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PrescriptionItem
         fields = [
-            'id', 'product', 'product_name', 'product_id',
+            'id', 'product_name', 'product_id',
             'quantity_prescribed', 'dosage_instructions', 'is_dispensed'
         ]
         read_only_fields = ['id', 'is_dispensed']
@@ -36,8 +37,8 @@ class PrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Prescription
         fields = [
-            'id', 'prescription_number', 'doctor', 'doctor_name', 'doctor_id',
-            'patient', 'patient_name', 'patient_id',
+            'id', 'prescription_number', 'doctor_name', 'doctor_id',
+            'patient_name', 'patient_id',
             'prescription_date', 'status',
             'verified_by', 'verified_by_name',
             'items', 'notes', 'created_at'
@@ -49,6 +50,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             return obj.verified_by.get_full_name() or obj.verified_by.username
         return None
     
+    @transaction.atomic # CRITICAL: Prevents orphaned prescriptions if item creation fails
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         import datetime
@@ -63,6 +65,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         
         return prescription
 
+    @transaction.atomic # CRITICAL: Prevents partial updates
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
         

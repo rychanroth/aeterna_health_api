@@ -95,27 +95,27 @@ def prescription_create(request):
     old_input = request.POST.dict() if request.method == 'POST' else {}
 
     if request.method == 'POST':
-        # Assemble the nested items payload from parallel arrays
-        product_ids = request.POST.getlist('product_id[]')
-        quantities = request.POST.getlist('quantity_prescribed[]')
-        dosages = request.POST.getlist('dosage_instructions[]')
-
-        items = []
-        for i in range(len(product_ids)):
-            if product_ids[i]: # Only add if a product was selected
-                items.append({
-                    'product_id': int(product_ids[i]),
-                    'quantity_prescribed': int(quantities[i]),
-                    'dosage_instructions': dosages[i]
-                })
-
         payload = {
             'doctor_id': old_input.get('doctor_id') or None,
             'patient_id': old_input.get('patient_id') or None,
             'prescription_date': old_input.get('prescription_date'),
             'notes': old_input.get('notes', ''),
-            'items': items
+            'items': []
         }
+
+        # Assemble items
+        product_ids = request.POST.getlist('product_id[]')
+        quantities = request.POST.getlist('quantity_prescribed[]')
+        dosages = request.POST.getlist('dosage_instructions[]')
+
+        for i in range(len(product_ids)):
+            if product_ids[i]:
+                payload['items'].append({
+                    'product': int(product_ids[i]),       # FIX: Standard DRF relational key expectation
+                    'product_id': int(product_ids[i]),    # Kept as fallback for explicit primary key configurations
+                    'quantity_prescribed': int(quantities[i]),
+                    'dosage_instructions': dosages[i]
+                })
 
         response = api_call('POST', '/api/prescriptions/', data=payload, token=token)
         if response.status_code == 201:
@@ -123,21 +123,22 @@ def prescription_create(request):
             return redirect('template-prescription-list')
         elif response.status_code == 400:
             errors = response.json()
-            messages.error(request, 'Failed to create prescription. Check form errors.')
+            messages.error(request, 'Failed to create prescription.')
         else:
-            messages.error(request, 'An unexpected error occurred.')
-
-    # Fetch dropdown data
-    doctors_res = api_call('GET', '/api/doctors/?page_size=50', token=token)
-    doctors = doctors_res.json().get('results', []) if doctors_res.status_code == 200 else []
-
-    patients_res = api_call('GET', '/api/patients/?page_size=50', token=token)
-    patients = patients_res.json().get('results', []) if patients_res.status_code == 200 else []
-
-    products_res = api_call('GET', '/api/products/?page_size=100', token=token)
-    products = products_res.json().get('results', []) if products_res.status_code == 200 else []
+            # --- START DEBUGGING BLOCK ---
+            print("\n" + "="*50)
+            print(f"DEBUG: API returned unexpected status code: {response.status_code}")
+            try:
+                print(f"DEBUG: Response JSON: {response.json()}")
+            except Exception:
+                print(f"DEBUG: Raw Response Text: {response.text[:500]}") # limit output
+            print("="*50 + "\n")
+            
+            # Pass the status code to the UI so you know what happened immediately
+            messages.error(request, f'An unexpected error occurred (API Status {response.status_code}).')
+            # --- END DEBUGGING BLOCK ---
 
     return render(request, 'prescriptions/prescription_form.html', {
-        'errors': errors, 'old_input': old_input,
-        'doctors': doctors, 'patients': patients, 'products': products,
+        'errors': errors,
+        'old_input': old_input,
     })
