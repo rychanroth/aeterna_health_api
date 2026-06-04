@@ -3,14 +3,14 @@ import string
 import secrets
 from decimal import Decimal
 from django.db import models, transaction
-from django.core.exceptions import ValidationError
+# FIX 1: Import DRF's ValidationError so the API turns these into clean 400 JSON responses
+from rest_framework.exceptions import ValidationError
 from .abstracts import CoreAbstractModel
 
 def generate_sale_number():
     """Generate a unique Sale number like: SL-20260603-X9Y8"""
     today_str = datetime.date.today().strftime('%Y%m%d')
     chars = string.ascii_uppercase + string.digits
-    # FIX: Use secrets.choice() in a comprehension
     random_str = ''.join(secrets.choice(chars) for _ in range(4))
     return f"SL-{today_str}-{random_str}"
 
@@ -37,8 +37,8 @@ class Sale(CoreAbstractModel):
     def calculate_total(self):
         return sum(item.subtotal for item in self.items.all())
 
+    # FIX 2: Reverted to standard save since SaleItem handles individual stock checks
     def save(self, *args, **kwargs):
-        # Sale number is handled by the field default. No manual generation needed!
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -102,7 +102,6 @@ class SaleItem(CoreAbstractModel):
 
     def delete(self, *args, **kwargs):
         # CONSTRAINT ENFORCEMENT: Cannot delete a sale item audit trail
-        # This also prevents orphaning the immutable StockMovement records
         raise ValidationError("Sale items cannot be deleted as they are immutable audit records.")
 
     def __str__(self):
