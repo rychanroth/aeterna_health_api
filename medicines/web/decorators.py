@@ -34,3 +34,15 @@ def role_required(allowed_roles):
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator
+
+def admin_required(view_func):
+    """Admin Only (Users, Suppliers, Reports)"""
+    return role_required(['admin'])(view_func)
+
+def pharmacy_staff_required(view_func):
+    """Admin or Pharmacist (Inventory, Clinical)"""
+    return role_required(['admin', 'pharmacist'])(view_func)
+
+def pos_staff_required(view_func):
+    """Admin or Cashier (POS, Dispensing)"""
+    return role_required(['admin', 'cashier'])(view_func)

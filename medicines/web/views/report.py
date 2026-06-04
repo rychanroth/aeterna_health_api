@@ -6,6 +6,7 @@ from medicines.web.api_helper import *
 from medicines.web.decorators import *
 
 @login_required_template
+@admin_required
 def reports_dashboard(request):
     token = request.session.get('token')
     

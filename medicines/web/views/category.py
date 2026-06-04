@@ -6,6 +6,7 @@ from medicines.web.decorators import *
 
 # === Categories ===
 @login_required_template
+@pharmacy_staff_required
 def categories_list(request):
     token = request.session.get('token')
     
@@ -66,6 +67,7 @@ def categories_list(request):
     })
     
 @login_required_template
+@pharmacy_staff_required
 def category_create(request):
     token = request.session.get('token')
     errors = {}
@@ -112,6 +114,7 @@ def category_create(request):
 
 # === Category Detail (Updated) ===
 @login_required_template
+@pharmacy_staff_required
 def category_detail(request, id):
     token = request.session.get('token')
     
@@ -158,6 +161,7 @@ def category_detail(request, id):
 
 # === Category Edit (PATCH) ===
 @login_required_template
+@pharmacy_staff_required
 def category_edit(request, id):
     token = request.session.get('token')
     errors = {}
@@ -221,6 +225,7 @@ def category_edit(request, id):
 
 # === Category Delete (DELETE) ===
 @login_required_template
+@pharmacy_staff_required
 def category_delete(request, id):
     # Only process if it's our special POST disguised as DELETE
     if request.method == 'POST' and request.POST.get('_method') == 'DELETE':
@@ -238,6 +243,7 @@ def category_delete(request, id):
 
 # === Category Tree View ===
 @login_required_template
+@pharmacy_staff_required
 def category_tree(request):
     token = request.session.get('token')
     
@@ -267,6 +273,7 @@ def category_tree(request):
 
 # === Category Roots View ===
 @login_required_template
+@pharmacy_staff_required
 def category_roots(request):
     token = request.session.get('token')
     response = api_call('GET', '/api/categories/roots/', token=token)
@@ -276,6 +283,7 @@ def category_roots(request):
 
 # === Category Bulk Move ===
 @login_required_template
+@pharmacy_staff_required
 def category_bulk_move(request):
     token = request.session.get('token')
     errors = {}

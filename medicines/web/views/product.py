@@ -39,6 +39,7 @@ def product_list(request):
     })
 
 @login_required_template
+@pharmacy_staff_required
 def product_create(request):
     token = request.session.get('token')
     errors = {}
@@ -102,6 +103,7 @@ def product_detail(request, id):
     return render(request, 'products/product_detail.html', {'product': product})
 
 @login_required_template
+@pharmacy_staff_required
 def product_edit(request, id):
     token = request.session.get('token')
     errors = {}
@@ -161,6 +163,7 @@ def product_edit(request, id):
     })
 
 @login_required_template
+@pharmacy_staff_required
 def product_delete(request, id):
     if request.method == 'POST' and request.POST.get('_method') == 'DELETE':
         token = request.session.get('token')

@@ -3,10 +3,10 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from urllib.parse import urlencode
 from medicines.web.api_helper import *
-from medicines.web.decorators import login_required_template, role_required
+from medicines.web.decorators import *
 
 @login_required_template
-@role_required(['admin'])
+@admin_required
 def user_list(request):
     token = request.session.get('token')
     current_page = request.GET.get('page', 1)
@@ -37,7 +37,7 @@ def user_list(request):
     })
 
 @login_required_template
-@role_required(['admin'])
+@admin_required
 def user_create(request):
     token = request.session.get('token')
     errors = {}
@@ -88,7 +88,7 @@ def user_me(request):
     return render(request, 'users/user_profile.html', {'profile': profile_data})
 
 @login_required_template
-@role_required(['admin'])
+@admin_required
 def user_edit(request, id):
     token = request.session.get('token')
     errors = {}
@@ -126,7 +126,7 @@ def user_edit(request, id):
 
 
 @login_required_template
-@role_required(['admin'])
+@admin_required
 def user_delete(request, id):
     # SAFETY: Cannot delete primary Admin (id=1) or currently logged in user
     current_user_id = request.session.get('user_id')

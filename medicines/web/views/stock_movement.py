@@ -66,6 +66,7 @@ def stock_movement_list(request):
 
 
 @login_required_template
+@pharmacy_staff_required
 def stock_movement_detail(request, id):
     token = request.session.get('token')
     response = api_call('GET', f'/api/stock-movements/{id}/', token=token)

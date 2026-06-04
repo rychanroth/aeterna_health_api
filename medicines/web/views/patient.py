@@ -6,6 +6,7 @@ from medicines.web.api_helper import *
 from medicines.web.decorators import *
 
 @login_required_template
+@pharmacy_staff_required
 def patient_list(request):
     token = request.session.get('token')
     current_page = request.GET.get('page', 1)
@@ -42,6 +43,7 @@ def patient_list(request):
     })
 
 @login_required_template
+@pharmacy_staff_required
 def patient_create(request):
     token = request.session.get('token')
     errors, old_input = {}, {}
@@ -70,6 +72,7 @@ def patient_create(request):
     })
 
 @login_required_template
+@pharmacy_staff_required
 def patient_detail(request, id):
     token = request.session.get('token')
     response = api_call('GET', f'/api/patients/{id}/', token=token)
@@ -79,6 +82,7 @@ def patient_detail(request, id):
     return render(request, 'patients/patient_detail.html', {'patient': response.json()})
 
 @login_required_template
+@pharmacy_staff_required
 def patient_edit(request, id):
     token = request.session.get('token')
     errors = {}
@@ -113,6 +117,7 @@ def patient_edit(request, id):
     })
 
 @login_required_template
+@pharmacy_staff_required
 def patient_delete(request, id):
     if request.method == 'POST' and request.POST.get('_method') == 'DELETE':
         token = request.session.get('token')

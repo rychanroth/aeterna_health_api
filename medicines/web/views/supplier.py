@@ -5,6 +5,7 @@ from medicines.web.api_helper import *
 from medicines.web.decorators import *
 
 @login_required_template
+@admin_required
 def supplier_list(request):
     token = request.session.get('token')
     current_page = request.GET.get('page', 1)
@@ -40,6 +41,7 @@ def supplier_list(request):
     })
 
 @login_required_template
+@admin_required
 def supplier_create(request):
     token = request.session.get('token')
     errors = {}
@@ -76,6 +78,7 @@ def supplier_create(request):
     })
 
 @login_required_template
+@admin_required
 def supplier_detail(request, id):
     token = request.session.get('token')
     
@@ -91,6 +94,7 @@ def supplier_detail(request, id):
     })
 
 @login_required_template
+@admin_required
 def supplier_edit(request, id):
     token = request.session.get('token')
     errors = {}
@@ -133,6 +137,7 @@ def supplier_edit(request, id):
     })
 
 @login_required_template
+@admin_required
 def supplier_delete(request, id):
     if request.method == 'POST' and request.POST.get('_method') == 'DELETE':
         token = request.session.get('token')

@@ -12,6 +12,7 @@ def _parse_prescription_dates(prescriptions):
     return prescriptions
 
 @login_required_template
+@pharmacy_staff_required
 def prescription_list(request):
     token = request.session.get('token')
     current_page = request.GET.get('page', 1)
@@ -54,6 +55,7 @@ def prescription_list(request):
     })
 
 @login_required_template
+@pharmacy_staff_required
 def prescription_detail(request, id):
     token = request.session.get('token')
     response = api_call('GET', f'/api/prescriptions/{id}/', token=token)
@@ -65,6 +67,7 @@ def prescription_detail(request, id):
     return render(request, 'prescriptions/prescription_detail.html', {'prescription': prescription})
 
 @login_required_template
+@pharmacy_staff_required
 def prescription_verify(request, id):
     if request.method == 'POST':
         token = request.session.get('token')
@@ -77,6 +80,7 @@ def prescription_verify(request, id):
     return redirect('template-prescription-detail', id=id)
 
 @login_required_template
+@pharmacy_staff_required
 def prescription_reject(request, id):
     if request.method == 'POST':
         token = request.session.get('token')
@@ -89,6 +93,7 @@ def prescription_reject(request, id):
     return redirect('template-prescription-detail', id=id)
 
 @login_required_template
+@pharmacy_staff_required
 def prescription_create(request):
     token = request.session.get('token')
     errors = {}
@@ -144,6 +149,7 @@ def prescription_create(request):
     })
 
 @login_required_template
+@pharmacy_staff_required
 def prescription_dispense(request, id):
     token = request.session.get('token')
     errors = {}
