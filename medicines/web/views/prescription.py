@@ -64,7 +64,11 @@ def prescription_detail(request, id):
         return redirect('template-prescription-list')
     
     prescription = _parse_prescription_dates([response.json()])[0]
-    return render(request, 'prescriptions/prescription_detail.html', {'prescription': prescription})
+    
+    return render(request, 'prescriptions/prescription_detail.html', {
+        'prescription': prescription,
+        'rx': prescription
+    })
 
 @login_required_template
 @pharmacy_staff_required
@@ -146,6 +150,7 @@ def prescription_create(request):
     return render(request, 'prescriptions/prescription_form.html', {
         'errors': errors,
         'old_input': old_input,
+        'token': token  
     })
 
 @login_required_template
@@ -196,10 +201,25 @@ def prescription_dispense(request, id):
             messages.success(request, f"Prescription {prescription['prescription_number']} dispensed successfully!")
             return redirect('template-sale-detail', id=sale_id)
         else:
-            errors = response.json()
-            messages.error(request, 'Failed to dispense prescription. Check stock availability.')
+            # FIX: Safely parse and extract specific validation errors from API
+            try:
+                errors = response.json()
+                error_messages = []
+                if isinstance(errors, dict):
+                    for field, msgs in errors.items():
+                        # Handle lists of errors (e.g., {'quantity': ['Insufficient stock...']})
+                        if isinstance(msgs, list):
+                            error_messages.append(f"{msgs[0]}")
+                        else:
+                            error_messages.append(f"{msgs}")
+                    error_msg = " | ".join(error_messages)
+                else:
+                    error_msg = "Validation failed."
+                messages.error(request, error_msg)
+            except (ValueError, TypeError, KeyError):
+                messages.error(request, 'Failed to dispense prescription. Check stock availability.')
 
-    # GET Request: Enrich prescription items with current product prices
+    # GET Request or Form Fallback: Enrich prescription items with current product prices
     total_amount = 0
     enriched_items = []
     

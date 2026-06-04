@@ -4,7 +4,7 @@
 {% block page_title %}Create Prescription{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-100 shadow-sm" x-data="prescriptionForm()">
+<div class="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-100 shadow-sm" x-data="prescriptionForm('{{ request.session.token }}')">
     <form method="POST" class="space-y-8">
         {% csrf_token %}
         
@@ -203,7 +203,7 @@
 </div>
 
 <script>
-    function prescriptionForm() {
+    function prescriptionForm(apiToken) {
         return {
             patientQuery: '', patientResults: [], showPatientDropdown: false, selectedPatientId: '', selectedPatientName: '',
             doctorQuery: '', doctorResults: [], showDoctorDropdown: false, selectedDoctorId: '', selectedDoctorName: '',
@@ -217,7 +217,12 @@
 
             async searchPatients() {
                 if (this.patientQuery.length < 2) { this.patientResults = []; return; }
-                const res = await fetch(`/api/patients/?search=${this.patientQuery}`, {credentials: 'include'});
+                const res = await fetch(`/api/patients/?search=${this.patientQuery}`, {
+                    credentials: 'include', // Keep for cookie-based auth if any
+                    headers: {
+                        'Authorization': `Token ${apiToken}` // FIX: Inject Token Auth
+                    }
+                });
                 const data = await res.json();
                 this.patientResults = data.results || data;
             },
@@ -229,7 +234,12 @@
 
             async searchDoctors() {
                 if (this.doctorQuery.length < 2) { this.doctorResults = []; return; }
-                const res = await fetch(`/api/doctors/?search=${this.doctorQuery}`, {credentials: 'include'});
+                const res = await fetch(`/api/doctors/?search=${this.doctorQuery}`, {
+                    credentials: 'include',
+                    headers: {
+                        'Authorization': `Token ${apiToken}` // FIX: Inject Token Auth
+                    }
+                });
                 const data = await res.json();
                 this.doctorResults = data.results || data;
             },
@@ -246,7 +256,12 @@
 
             async searchProducts(index) {
                 if (this.items[index].query.length < 2) { this.items[index].results = []; return; }
-                const res = await fetch(`/api/products/?search=${this.items[index].query}`, {credentials: 'include'});
+                const res = await fetch(`/api/products/?search=${this.items[index].query}`, {
+                    credentials: 'include',
+                    headers: {
+                        'Authorization': `Token ${apiToken}` // FIX: Inject Token Auth
+                    }
+                });
                 const data = await res.json();
                 this.items[index].results = data.results || data;
             },

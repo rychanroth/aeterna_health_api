@@ -41,6 +41,13 @@
             </button>
         </form>
         {% endif %}
+        {% if rx.status == 'verified' %}
+        <a href="{% url 'template-prescription-dispense' rx.id %}" 
+           title="Dispense Prescription" 
+           class="w-full md:w-auto text-center justify-center bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white px-5 py-2.5 rounded-xl shadow-sm shadow-purple-600/20 text-sm flex items-center gap-2 font-bold transition-all">
+            <i class='bx bx-cart text-base'></i> Dispense Prescription
+        </a>
+        {% endif %}
     </div>
 </div>
 
