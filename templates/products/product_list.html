@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Products{% endblock %}
+{% block page_title %}Products Management{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div class="flex items-center gap-2">
+        <a href="{% url 'template-product-list' %}" class="px-3 py-1 rounded shadow text-sm {% if not low_stock and not expired %}bg-green-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">All</a>
+        <a href="?low_stock=true" class="px-3 py-1 rounded shadow text-sm flex items-center gap-1 {% if low_stock == 'true' %}bg-yellow-500 text-white{% else %}bg-yellow-100 text-yellow-800 hover:bg-yellow-200{% endif %}"><i class='bx bx-error'></i> Low Stock</a>
+        <a href="?expired=true" class="px-3 py-1 rounded shadow text-sm flex items-center gap-1 {% if expired == 'true' %}bg-red-600 text-white{% else %}bg-red-100 text-red-800 hover:bg-red-200{% endif %}"><i class='bx bx-calendar-exclamation'></i> Expired</a>
+    </div>
+    <a href="{% url 'template-product-create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow flex items-center gap-1"><i class='bx bx-plus-medical'></i> Add Product</a>
+</div>
+
+<form method="GET" action="{% url 'template-product-list' %}" class="mb-6 bg-white p-4 rounded shadow flex gap-4 items-end">
+    <input type="hidden" name="low_stock" value="{{ low_stock }}">
+    <input type="hidden" name="expired" value="{{ expired }}">
+    <div class="flex-1">
+        <input type="text" name="search" value="{{ search_query }}" placeholder="Search products..." class="w-full border border-gray-300 rounded px-3 py-2">
+    </div>
+    <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 h-10">Search</button>
+</form>
+
+<div class="bg-white rounded shadow overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-800 text-white text-sm">
+                <th class="p-3">Image</th>
+                <th class="p-3">Name</th>
+                <th class="p-3">Category</th>
+                <th class="p-3">Price</th>
+                <th class="p-3">Stock</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prod in products %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3">
+                    {% if prod.image %}<img src="{{ prod.image }}" class="w-[30px] h-[30px] object-cover rounded">
+                    {% else %}<div class="w-[30px] h-[30px] bg-gray-100 border rounded flex items-center justify-center text-gray-400"><i class="bx bx-image"></i></div>{% endif %}
+                </td>
+                <td class="p-3 font-semibold text-green-700 hover:underline"><a href="{% url 'template-product-detail' prod.id %}">{{ prod.name }}</a></td>
+                <td class="p-3 text-gray-600">{{ prod.category.name|default:"-" }}</td>
+                <td class="p-3 text-gray-800">$ {{ prod.selling_price }}</td>
+                <td class="p-3 font-bold {% if prod.is_low_stock %}text-yellow-600{% else %}text-gray-800{% endif %}">{{ prod.stock_quantity }}</td>
+                <td class="p-3">
+                    <div class="flex flex-col gap-1">
+                        {% if prod.is_expired %}<span class="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded w-max">Expired</span>{% endif %}
+                        {% if prod.effective_requires_prescription %}<span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded w-max">Rx</span>{% endif %}
+                        {% if prod.is_low_stock and not prod.is_expired %}<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded w-max">Low</span>{% endif %}
+                    </div>
+                </td>
+                <td class="p-3">
+                    <div class="flex items-center gap-3">
+                        <a href="{% url 'template-product-detail' prod.id %}" title="View" class="text-blue-600 hover:text-blue-800"><i class='bx bx-show text-lg'></i></a>
+                        <a href="{% url 'template-product-edit' prod.id %}" title="Edit" class="text-yellow-600 hover:text-yellow-800"><i class='bx bx-edit text-lg'></i></a>
+                        <form method="POST" action="{% url 'template-product-delete' prod.id %}" class="inline" onsubmit="return confirm('Delete?');">
+                            {% csrf_token %}<input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" title="Delete" class="text-red-600 hover:text-red-800"><i class='bx bx-trash text-lg'></i></button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="p-4 text-center text-gray-500">No products found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

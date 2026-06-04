@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Root Categories{% endblock %}
+{% block page_title %}Root Categories Hierarchy{% endblock %}
+
+{% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <a href="{% url 'template-category-list' %}" class="text-gray-600 hover:text-gray-900 flex items-center gap-2 text-sm font-medium">
+            <i class="bx bx-arrow-back text-lg"></i> Back to All Categories
+        </a>
+        <a href="{% url 'template-category-create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-sm font-medium flex items-center gap-1">
+            <i class="bx bx-plus text-lg"></i> Add Root Category
+        </a>
+    </div>
+
+    <div class="mb-6 bg-blue-50 border border-blue-200 rounded p-4 flex items-start gap-3">
+        <i class="bx bx-info-circle text-blue-500 text-xl mt-0.5"></i>
+        <div>
+            <h4 class="text-blue-800 font-semibold text-sm">Top-Level Roots</h4>
+            <p class="text-blue-700 text-xs mt-0.5">These are the foundation categories (Depth: 0). Any branch or subcategory in your inventory tree branches outward from these nodes.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for cat in roots %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 flex flex-col justify-between overflow-hidden">
+                
+                <div class="p-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            {% if cat.image %}
+                                <img src="{{ cat.image }}" class="w-[50px] h-[50px] object-cover rounded-lg border border-gray-100">
+                            {% else %}
+                                <div class="w-[50px] h-[50px] bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-2xl select-none">
+                                    <i class="bx bx-image"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <div>
+                                <h3 class="font-bold text-gray-800 text-base tracking-tight leading-tight">{{ cat.name }}</h3>
+                                <span class="inline-block text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mt-1 font-medium">
+                                    {{ cat.product_type_name|default:"Unassigned" }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div>
+                            {% if cat.is_active %}
+                                <span class="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full">Active</span>
+                            {% else %}
+                                <span class="bg-red-100 text-red-700 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full">Inactive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 border-t border-b border-gray-50 my-4 py-3 text-center">
+                        <div>
+                            <span class="block text-xs text-gray-400 font-medium uppercase tracking-wider">Direct Products</span>
+                            <span class="text-lg font-bold text-gray-700">{{ cat.products_count|default:"0" }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-xs text-gray-400 font-medium uppercase tracking-wider">Total Stock</span>
+                            <span class="text-lg font-bold text-gray-700">{{ cat.total_stock|default:"0" }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 border-t border-gray-100 px-5 py-3 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <a href="{% url 'template-category-edit' cat.id %}" class="text-amber-500 hover:text-amber-600 text-xl transition-colors" title="Edit Root">
+                            <i class="bx bx-edit-alt"></i>
+                        </a>
+                        <a href="#" class="text-red-500 hover:text-red-600 text-xl transition-colors" title="Delete Root" onclick="return confirm('Deleting a root category might orphan its subcategories. Are you sure?');">
+                            <i class="bx bx-trash"></i>
+                        </a>
+                    </div>
+
+                    <a href="{% url 'template-category-detail' cat.id %}" class="text-green-600 hover:text-green-700 text-xs font-semibold flex items-center gap-1 group">
+                        Manage Subcategories 
+                        <i class="bx bx-right-arrow-alt text-base transform group-hover:translate-x-0.5 transition-transform"></i>
+                    </a>
+                </div>
+
+            </div>
+        {% empty %}
+            <div class="col-span-full bg-white border border-dashed border-gray-300 rounded-xl p-12 text-center">
+                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-2xl mx-auto mb-3">
+                    <i class="bx bx-folder"></i>
+                </div>
+                <h3 class="text-sm font-semibold text-gray-800">No root categories found</h3>
+                <p class="text-xs text-gray-500 mt-1">Get started by creating your very first top-level structural folder.</p>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

@@ -14,7 +14,7 @@ from rest_framework import status
 from django.urls import reverse
 from decimal import Decimal
 from datetime import date
-from medicines.models import (
+from medicines.core.models import (
     User, Supplier, ProductType, Category, Product,
     Doctor, Patient, Prescription, PrescriptionItem,
     Sale, SaleItem, StockMovement

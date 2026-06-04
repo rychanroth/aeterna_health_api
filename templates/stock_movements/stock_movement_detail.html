@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block title %}Movement Details - {{ movement.reference|default:"Record" }}{% endblock %}
+{% block page_title %}Movement Details{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto pb-10">
+    
+    <div class="flex justify-between items-center mb-6">
+        <a href="javascript:window.close();" class="text-slate-500 hover:text-slate-800 flex items-center gap-2 font-medium text-sm bg-white border border-slate-200 px-4 py-2 rounded-lg shadow-sm transition-colors">
+            <i class='bx bx-left-arrow-alt text-lg'></i> Close Tab
+        </a>
+        
+        <div class="flex items-center gap-2">
+            <button onclick="window.print()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg shadow-sm text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-2">
+                <i class='bx bx-printer'></i> Print Record
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        
+        <div class="bg-slate-50 border-b border-slate-100 p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <i class='bx bx-receipt text-emerald-600'></i> 
+                    {{ movement.reference|default:"Unreferenced Movement" }}
+                </h2>
+                <p class="text-slate-500 text-sm mt-1 flex items-center gap-1.5">
+                    <i class='bx bx-calendar'></i> {{ movement.created_at|date:"F d, Y \a\t h:i A" }}
+                </p>
+            </div>
+            
+            <div>
+                {% if movement.is_stock_in %}
+                <span class="bg-emerald-100 text-emerald-800 text-sm font-bold px-4 py-2 rounded-lg inline-flex items-center gap-2 shadow-sm border border-emerald-200">
+                    <i class='bx bx-log-in text-lg'></i> STOCK IN
+                </span>
+                {% else %}
+                <span class="bg-rose-100 text-rose-800 text-sm font-bold px-4 py-2 rounded-lg inline-flex items-center gap-2 shadow-sm border border-rose-200">
+                    <i class='bx bx-log-out text-lg'></i> STOCK OUT
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="p-6 sm:p-8 space-y-8">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-emerald-50/50 p-6 rounded-xl border border-emerald-100/50">
+                <div>
+                    <label class="block text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">Product Involved</label>
+                    <p class="text-xl font-bold text-emerald-950">{{ movement.product_name }}</p>
+                </div>
+                <div class="sm:text-right">
+                    <label class="block text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">Movement Quantity</label>
+                    <p class="text-3xl font-black {% if movement.is_stock_in %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                        {% if movement.is_stock_in %}+{% else %}-{% endif %}{{ movement.quantity }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-500 mb-1">Reason / Type</label>
+                    <p class="text-base font-medium text-slate-900 bg-slate-50 border border-slate-100 px-4 py-2.5 rounded-lg">
+                        {{ movement.get_movement_type_display|default:movement.movement_type }}
+                    </p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-semibold text-slate-500 mb-1">System Reference ID</label>
+                    <p class="text-base font-mono text-slate-900 bg-slate-50 border border-slate-100 px-4 py-2.5 rounded-lg">
+                        {{ movement.reference|default:"—" }}
+                    </p>
+                </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-500 mb-2">Internal Notes & Logs</label>
+                <div class="bg-slate-50 border border-slate-100 p-5 rounded-xl text-slate-700 min-h-[100px] whitespace-pre-wrap leading-relaxed text-sm">{% if movement.notes %}{{ movement.notes }}{% else %}<span class="text-slate-400 italic">No additional notes provided for this transaction.</span>{% endif %}</div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

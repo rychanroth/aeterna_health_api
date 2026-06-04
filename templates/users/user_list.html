@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management{% endblock %}
+{% block page_title %}Users{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <p class="text-sm text-gray-500">Total: {{ count }}</p>
+    <a href="{% url 'template-user-create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow flex items-center gap-1">
+        <i class='bx bx-user-plus'></i> Add User
+    </a>
+</div>
+
+<form method="GET" action="{% url 'template-user-list' %}" class="mb-6 bg-white p-4 rounded shadow flex gap-4 items-end">
+    <div class="flex-1">
+        <input type="text" name="search" value="{{ search_query }}" placeholder="Search username, name..." class="w-full border border-gray-300 rounded px-3 py-2">
+    </div>
+    <div class="w-48">
+        <select name="role" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
+            <option value="">All Roles</option>
+            <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Admin</option>
+            <option value="pharmacist" {% if role_filter == 'pharmacist' %}selected{% endif %}>Pharmacist</option>
+            <option value="cashier" {% if role_filter == 'cashier' %}selected{% endif %}>Cashier</option>
+        </select>
+    </div>
+    <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 h-10">Filter</button>
+</form>
+
+<div class="bg-white rounded shadow overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-800 text-white text-sm">
+                <th class="p-3">Image</th>
+                <th class="p-3">Username</th>
+                <th class="p-3">Name</th>
+                <th class="p-3">Role</th>
+                <th class="p-3">Phone</th>
+                <th class="p-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3">
+                    {% if u.image %}
+                    <img src="{{ u.image }}" class="w-[30px] h-[30px] object-cover rounded-full">
+                    {% else %}
+                    <div class="w-[30px] h-[30px] bg-gray-100 border border-gray-200 rounded-full flex items-center justify-center text-gray-400 text-lg">
+                        <i class="bx bx-user"></i>
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="p-3 font-semibold text-gray-800">{{ u.username }}</td>
+                <td class="p-3 text-gray-600">{{ u.first_name }} {{ u.last_name }}</td>
+                <td class="p-3">
+                    {% if u.role == 'admin' %}
+                    <span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">Admin</span>
+                    {% elif u.role == 'pharmacist' %}
+                    <span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">Pharmacist</span>
+                    {% elif u.role == 'cashier' %}
+                    <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Cashier</span>
+                    {% endif %}
+                </td>
+                <td class="p-3 text-gray-600">{{ u.phone|default:"-" }}</td>
+                <td class="p-3">
+                    <div class="flex items-center gap-3">
+                        <a href="{% url 'template-user-edit' u.id %}" title="Edit" class="text-yellow-600 hover:text-yellow-800"><i class='bx bx-edit text-lg'></i></a>
+                        <form method="POST" action="{% url 'template-user-delete' u.id %}" class="inline" onsubmit="return confirm('Delete this user?');">
+                            {% csrf_token %}<input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" title="Delete" class="text-red-600 hover:text-red-800"><i class='bx bx-trash text-lg'></i></button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="p-4 text-center text-gray-500">No users found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Aeterna Health{% endblock %}
+{% block page_title %}System Overview{% endblock %}
+
+{% block content %}
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+
+<div class="max-w-7xl mx-auto px-4 py-6 space-y-8">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+        <div>
+            <h2 class="text-2xl font-black text-gray-900 tracking-tight">Welcome back, {{ username }}</h2>
+            <p class="text-xs text-gray-500 font-medium mt-0.5">Here's an overview of Aeterna Health's operations today.</p>
+        </div>
+        <div>
+            <a href="{% url 'template-reports-dashboard' %}" 
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 shadow-sm shadow-teal-600/10 active:scale-[0.99] transition">
+                <i class='bx bx-bar-chart-alt-2 text-sm'></i> 
+                <span>Full Analytics Report</span>
+            </a>
+        </div>
+    </div>
+
+    {% if dashboard %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between shadow-sm group hover:border-emerald-200 transition">
+            <div class="space-y-1">
+                <span class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Today's Gross Revenue</span>
+                <span class="block text-2xl font-black text-gray-900 tracking-tight">$ {{ dashboard.today_sales.total_revenue|floatformat:2 }}</span>
+            </div>
+            <div class="w-12 h-12 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                <i class='bx bx-money text-xl'></i>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between shadow-sm group hover:border-blue-200 transition">
+            <div class="space-y-1">
+                <span class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Completed Sales</span>
+                <span class="block text-2xl font-black text-gray-900 tracking-tight">{{ dashboard.today_sales.total_transactions }}</span>
+            </div>
+            <div class="w-12 h-12 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                <i class='bx bx-receipt text-xl'></i>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between shadow-sm group hover:border-amber-200 transition">
+            <div class="space-y-1">
+                <span class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Low Stock Warnings</span>
+                <span class="block text-2xl font-black {% if dashboard.low_stock_alerts > 0 %}text-amber-600{% else %}text-gray-900{% endif %} tracking-tight">
+                    {{ dashboard.low_stock_alerts }}
+                </span>
+            </div>
+            <div class="w-12 h-12 {% if dashboard.low_stock_alerts > 0 %}bg-amber-50 border-amber-100 text-amber-600 group-hover:bg-amber-500{% else %}bg-gray-50 border-gray-100 text-gray-400 group-hover:bg-gray-400{% endif %} border rounded-xl flex items-center justify-center shadow-sm group-hover:text-white transition-all duration-300">
+                <i class='bx bx-package text-xl'></i>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between shadow-sm group hover:border-rose-200 transition">
+            <div class="space-y-1">
+                <span class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Expiring Batches (30d)</span>
+                <span class="block text-2xl font-black {% if dashboard.expiring_soon_alerts > 0 %}text-rose-600{% else %}text-gray-900{% endif %} tracking-tight">
+                    {{ dashboard.expiring_soon_alerts }}
+                </span>
+            </div>
+            <div class="w-12 h-12 {% if dashboard.expiring_soon_alerts > 0 %}bg-rose-50 border-rose-100 text-rose-600 group-hover:bg-rose-500{% else %}bg-gray-50 border-gray-100 text-gray-400 group-hover:bg-gray-400{% endif %} border rounded-xl flex items-center justify-center shadow-sm group-hover:text-white transition-all duration-300">
+                <i class='bx bx-time text-xl'></i>
+            </div>
+        </div>
+
+    </div>
+
+    {% if dashboard.pending_rx > 0 or dashboard.low_stock_alerts > 0 %}
+    <div class="space-y-3">
+        <div class="flex items-center gap-2 text-gray-700">
+            <i class='bx bxs-bell-ring text-base text-teal-600 animate-pulse'></i>
+            <h3 class="font-bold text-xs uppercase tracking-wider">Attention Required Tasks</h3>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% if dashboard.pending_rx > 0 %}
+            <div class="bg-white border-l-4 border-purple-500 rounded-xl border border-gray-200 p-4 flex items-start gap-4 shadow-sm">
+                <div class="w-9 h-9 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class='bx bx-plus-medical text-lg'></i>
+                </div>
+                <div class="space-y-1 flex-1">
+                    <h4 class="font-bold text-sm text-gray-900">{{ dashboard.pending_rx }} Medical Prescriptions Awaiting Verification</h4>
+                    <p class="text-xs text-gray-500 leading-normal">Requires clinical pharmacist review before fulfillment pipelines can authorize inventory reduction transfers.</p>
+                    <a href="{% url 'template-prescription-list' %}?status=pending" class="inline-flex items-center gap-1 text-xs font-bold text-purple-600 hover:text-purple-700 mt-1 hover:underline">
+                        <span>Execute Verification Queue</span> &rarr;
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if dashboard.low_stock_alerts > 0 %}
+            <div class="bg-white border-l-4 border-amber-500 rounded-xl border border-gray-200 p-4 flex items-start gap-4 shadow-sm">
+                <div class="w-9 h-9 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class='bx bx-error text-lg'></i>
+                </div>
+                <div class="space-y-1 flex-1">
+                    <h4 class="font-bold text-sm text-gray-900">{{ dashboard.low_stock_alerts }} Inventory Products Breached Safe Thresholds</h4>
+                    <p class="text-xs text-gray-500 leading-normal">Stock count levels dropped below optimization targets. Order replenishment suggested to eliminate runout disruptions.</p>
+                    <a href="{% url 'template-product-list' %}?low_stock=true" class="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700 mt-1 hover:underline">
+                        <span>Analyze Procurement Requirements</span> &rarr;
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm max-w-lg mx-auto">
+        <div class="w-12 h-12 bg-gray-50 border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <i class='bx bx-server text-xl'></i>
+        </div>
+        <h3 class="font-bold text-sm text-gray-800 uppercase tracking-wider mb-1">Telemetry Sync Offline</h3>
+        <p class="text-xs text-gray-400 leading-normal">System metrics are currently unable to serialize safely from the server instance. Check authentication token session longevity.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

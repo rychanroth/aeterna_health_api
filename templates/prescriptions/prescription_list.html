@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Prescriptions{% endblock %}
+{% block page_title %}Prescription Management{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div class="flex items-center gap-2">
+        <a href="{% url 'template-prescription-list' %}" class="px-3 py-1 rounded shadow text-sm {% if not status_filter %}bg-green-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">All</a>
+        <a href="?status=pending" class="px-3 py-1 rounded shadow text-sm {% if status_filter == 'pending' %}bg-yellow-500 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">Pending</a>
+        <a href="?status=verified" class="px-3 py-1 rounded shadow text-sm {% if status_filter == 'verified' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">Verified</a>
+    </div>
+    <a href="{% url 'template-prescription-create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow flex items-center gap-1">
+        <i class='bx bx-plus-medical'></i> New Prescription
+    </a>
+</div>
+
+<form method="GET" action="{% url 'template-prescription-list' %}" class="mb-6 bg-white p-4 rounded shadow flex gap-4 items-end">
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <div class="flex-1">
+        <input type="text" name="search" value="{{ search_query }}" placeholder="Search Rx #, Doctor, Patient..." class="w-full border border-gray-300 rounded px-3 py-2">
+    </div>
+    <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 h-10">Search</button>
+</form>
+
+<div class="bg-white rounded shadow overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-800 text-white text-sm">
+                <th class="p-3">Rx #</th>
+                <th class="p-3">Date</th>
+                <th class="p-3">Patient</th>
+                <th class="p-3">Doctor</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rx in prescriptions %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3 font-bold text-green-700"><a href="{% url 'template-prescription-detail' rx.id %}">{{ rx.prescription_number }}</a></td>
+                <td class="p-3 text-gray-600">{{ rx.prescription_date }}</td>
+                <td class="p-3 text-gray-800">{{ rx.patient_name|default:"-" }}</td>
+                <td class="p-3 text-gray-800">{{ rx.doctor_name|default:"-" }}</td>
+                <td class="p-3">
+                    {% if rx.status == 'pending' %}
+                    <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded"><i class='bx bx-clock'></i> Pending</span>
+                    {% elif rx.status == 'verified' %}
+                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"><i class='bx bx-check-circle'></i> Verified</span>
+                    {% elif rx.status == 'dispensed' %}
+                    <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded"><i class='bx bx-check-double'></i> Dispensed</span>
+                    {% elif rx.status == 'rejected' %}
+                    <span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded"><i class='bx bx-x-circle'></i> Rejected</span>
+                    {% endif %}
+                </td>
+                <td class="p-3">
+                    <div class="flex items-center gap-3">
+                        <a href="{% url 'template-prescription-detail' rx.id %}" title="View" class="text-blue-600 hover:text-blue-800"><i class='bx bx-show text-lg'></i></a>
+                        
+                        {% if rx.status == 'verified' %}
+                        <a href="{% url 'template-prescription-dispense' rx.id %}" title="Dispense Prescription" class="text-purple-600 hover:text-purple-800"><i class='bx bx-cart text-lg'></i></a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="p-4 text-center text-gray-500">No prescriptions found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

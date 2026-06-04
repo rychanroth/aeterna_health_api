@@ -16,12 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('medicines.template_urls')),
-    path('api/', include('medicines.urls')),
+    path('api/', include('medicines.api.urls')),       # New API routes
+    path('', include('medicines.web.urls')),           # New Template routes
 
     # YOUR NEW DOCUMENTATION ROUTES:
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
@@ -32,3 +34,6 @@ urlpatterns = [
     # ReDoc (Cleaner, read-only documentation)
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

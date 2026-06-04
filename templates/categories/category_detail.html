@@ -1,0 +1,145 @@
+<!-- templates/categories/category_detail.html -->
+{% extends 'base.html' %}
+
+{% block title %}Category: {{ category.name }}{% endblock %}
+{% block page_title %}Category Details{% endblock %}
+
+{% block content %}
+<!-- Breadcrumbs (Ancestors) -->
+<div class="mb-4 text-sm text-gray-600 flex items-center gap-2">
+    <a href="{% url 'template-category-list' %}" class="hover:underline text-green-600">Categories</a>
+    {% for anc in ancestors %}
+        <i class='bx bx-chevron-right'></i>
+        <a href="{% url 'template-category-detail' anc.id %}" class="hover:underline text-green-600">{{ anc.name }}</a>
+    {% endfor %}
+    <i class='bx bx-chevron-right'></i>
+    <span class="font-semibold text-gray-800">{{ category.name }}</span>
+</div>
+
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <a href="{% url 'template-category-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Categories</a>
+        <h2 class="text-2xl font-bold text-gray-800 mt-1">{{ category.name }}</h2>
+        <p class="text-sm text-gray-500">Path: {{ category.full_path }} (Depth: {{ category.depth }})</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="{% url 'template-category-edit' category.id %}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow text-sm">Edit</a>
+        <!-- Delete Form -->
+        <form method="POST" action="{% url 'template-category-delete' category.id %}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
+            {% csrf_token %}
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow text-sm">Delete</button>
+        </form>
+    </div>
+</div>
+
+<!-- Category Info Card -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white p-6 rounded shadow col-span-1">
+        {% if category.image %}
+        <img src="{{ category.image }}" alt="{{ category.name }}" class="w-full h-48 object-cover rounded mb-4">
+        {% else %}
+        <div class="w-full h-48 bg-gray-200 rounded flex items-center justify-center text-gray-400 mb-4">No Image</div>
+        {% endif %}
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between border-b pb-2"><span class="font-semibold">Status:</span> 
+                {% if category.is_active %}<span class="text-green-600">Active</span>{% else %}<span class="text-red-600">Inactive</span>{% endif %}
+            </div>
+            <div class="flex justify-between border-b pb-2"><span class="font-semibold">Product Type:</span> <span>{{ category.product_type_name|default:"None" }}</span></div>
+            <div class="flex justify-between border-b pb-2"><span class="font-semibold">Total Stock:</span> <span>{{ category.total_stock }}</span></div>
+            <div class="flex justify-between"><span class="font-semibold">Products Count:</span> <span>{{ category.products_count }}</span></div>
+        </div>
+    </div>
+
+    <!-- Descendants Section -->
+    <div class="bg-white p-6 rounded shadow col-span-1 md:col-span-2">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Sub-Categories (Descendants)</h3>
+        {% if descendants|length > 0 %}
+        <ul class="space-y-2">
+            {% for desc in descendants %}
+            <li class="border p-3 rounded hover:bg-gray-50 flex items-center justify-between">
+                <div>
+                    <span style="margin-left: {{ desc.depth|default:'0' }}em;" class="text-gray-400">└</span>
+                    <a href="{% url 'template-category-detail' desc.id %}" class="text-blue-600 hover:underline font-medium">{{ desc.name }}</a>
+                </div>
+                <span class="text-xs text-gray-500">Depth: {{ desc.depth }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-500 text-sm">No sub-categories found.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Stock Summary Card -->
+{% if stock_summary %}
+<div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6 grid grid-cols-3 gap-4">
+    <div class="text-center">
+        <p class="text-xs text-blue-600 uppercase font-bold">Total Products</p>
+        <p class="text-2xl font-bold text-blue-800">{{ stock_summary.total_products }}</p>
+    </div>
+    <div class="text-center">
+        <p class="text-xs text-blue-600 uppercase font-bold">Total Stock</p>
+        <p class="text-2xl font-bold text-blue-800">{{ stock_summary.total_stock }}</p>
+    </div>
+    <div class="text-center">
+        <p class="text-xs text-blue-600 uppercase font-bold">Total Value</p>
+        <p class="text-2xl font-bold text-blue-800">$ {{ stock_summary.total_value|floatformat:2 }}</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Products Table in this Category -->
+<div class="bg-white rounded shadow overflow-hidden">
+    <div class="p-4 border-b flex justify-between items-center">
+        <h3 class="text-lg font-bold text-gray-800">Products in this Category</h3>
+        <span class="text-sm text-gray-500">Total: {{ count }}</span>
+    </div>
+    
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="bg-gray-100 border-b text-sm text-gray-600">
+                <th class="p-3">ID</th>
+                <th class="p-3">Product Name</th>
+                <th class="p-3">Stock</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prod in products %}
+            <tr class="border-b hover:bg-gray-50 text-sm">
+                <td class="p-3 text-gray-600">{{ prod.id }}</td>
+                <td class="p-3 font-semibold text-gray-800">{{ prod.name }}</td>
+                <td class="p-3">{{ prod.quantity_in_stock|default:0 }}</td>
+                <td class="p-3">
+                    {% if prod.is_active %}<span class="text-green-600 text-xs">Active</span>{% else %}<span class="text-red-600 text-xs">Inactive</span>{% endif %}
+                </td>
+                <td class="p-3">
+                    <div class="flex items-center gap-3">
+                        <a href="#" class="text-blue-600 hover:underline text-xs font-medium">View</a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="p-4 text-center text-gray-500">No products in this category yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination for Products -->
+    <div class="p-4 flex justify-between items-center border-t bg-gray-50">
+        {% if prev_page %}
+        <a href="?page={{ prev_page }}" class="text-sm text-blue-600 hover:underline">&larr; Previous</a>
+        {% endif %}
+        <span class="text-sm text-gray-600">Page {{ current_page }}</span>
+        {% if next_page %}
+        <a href="?page={{ next_page }}" class="text-sm text-blue-600 hover:underline">Next &rarr;</a>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

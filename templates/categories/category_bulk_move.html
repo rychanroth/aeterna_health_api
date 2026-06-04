@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}Bulk Move Categories{% endblock %}
+{% block page_title %}Bulk Move Categories{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'template-category-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to List</a>
+</div>
+
+<form method="POST" class="bg-white p-6 rounded shadow space-y-6">
+    {% csrf_token %}
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Left: Category Selection -->
+        <div class="col-span-2 border p-4 rounded max-h-[60vh] overflow-y-auto">
+            <h3 class="font-bold mb-3 text-gray-700">Select Categories to Move</h3>
+            {% for cat in categories %}
+            <label class="flex items-center gap-3 py-2 border-b hover:bg-gray-50 cursor-pointer" style="padding-left: {{ cat.depth|default:'0' }}1.5rem;">
+                <input type="checkbox" name="category_ids" value="{{ cat.id }}" class="h-4 w-4 text-green-600 rounded">
+                <span class="text-sm font-medium text-gray-800">{{ cat.name }}</span>
+                <span class="text-xs text-gray-400 ml-auto">ID: {{ cat.id }}</span>
+            </label>
+            {% empty %}
+            <p class="text-sm text-gray-500">No categories available.</p>
+            {% endfor %}
+        </div>
+
+        <!-- Right: Target Parent -->
+        <div>
+            <h3 class="font-bold mb-3 text-gray-700">Move to New Parent</h3>
+            <select name="new_parent_id" class="w-full border border-gray-300 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 mb-4">
+                <option value="">-- Root Level (No Parent) --</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" style="padding-left: {{ cat.depth|default:'0' }}1.5rem;">
+                    {{ cat.name }}
+                </option>
+                {% endfor %}
+            </select>
+            
+            <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow flex items-center justify-center gap-2">
+                <i class='bx bx-move'></i> Move Selected
+            </button>
+        </div>
+    </div>
+</form>
+{% endblock %}

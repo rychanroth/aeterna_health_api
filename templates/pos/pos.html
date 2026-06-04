@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Aeterna POS</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        /* Hide scrollbar for smooth UI */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Thermal Paper Styling */
+        .thermal-receipt {
+            width: 300px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #000;
+            background: #fff;
+            padding: 20px;
+        }
+        .thermal-receipt .divider {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+
+        /* Print Magic: Hide everything EXCEPT the receipt when printing */
+        @media print {
+            body * { visibility: hidden; }
+            .thermal-receipt, .thermal-receipt * { visibility: visible; }
+            .thermal-receipt {
+                position: absolute;
+                left: 0; top: 0; width: 100%; padding: 0; margin: 0;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen flex flex-col overflow-hidden" x-data="posApp()" x-init="init()">
+
+    <header class="bg-teal-700 text-white px-6 py-3 flex justify-between items-center shadow-md shrink-0 z-10">
+        <h1 class="text-xl font-extrabold tracking-wide shrink-0">AETERNA <span class="font-light">POS</span></h1>
+
+        <div class="flex items-center gap-6">
+            <button @click="openHistoryModal()" class="flex items-center gap-1 text-teal-200 hover:text-white transition shrink-0">
+                <i class='bx bx-history text-xl'></i>
+                <span class="text-sm font-medium hidden sm:inline">Sales History</span>
+            </button>
+
+            <div class="flex items-center gap-3 border-l border-teal-600 pl-6">
+                <div class="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-xs font-bold text-white uppercase shadow-sm">
+                    <i class='bx bx-user'></i>
+                </div>
+                <div class="leading-tight hidden lg:block">
+                    <p class="text-sm font-medium text-white whitespace-nowrap">{{ request.session.username }}</p>
+                    <p class="text-[10px] text-teal-200 uppercase tracking-wider font-semibold whitespace-nowrap">{{ request.session.role }}</p>
+                </div>
+                <a href="{% url 'template-logout' %}" class="text-teal-300 hover:text-white transition-colors flex items-center p-1 ml-2" title="Logout">
+                    <i class='bx bx-log-out-circle text-2xl'></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 grid grid-cols-5 divide-x divide-gray-200 overflow-hidden">
+
+        <div class="col-span-3 p-5 bg-gray-50 flex flex-col relative overflow-hidden">
+            
+            <div class="relative mb-5 shrink-0">
+                <i class='bx bx-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl'></i>
+                <input type="text" x-model="searchQuery" @input.debounce.300ms="searchProducts()" 
+                       placeholder="Scan barcode or search products by name..."
+                       class="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-300 shadow-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-lg transition-shadow">
+            </div>
+
+            <div class="flex-1 overflow-y-auto hide-scrollbar pb-20">
+                <div class="grid grid-cols-3 gap-4">
+                    <template x-for="prod in filteredProducts" :key="prod.id">
+                        <button @click="openProductDetails(prod)" 
+                                :disabled="!prod.is_active || prod.is_expired || prod.effective_requires_prescription || prod.requires_prescription || prod.stock_quantity <= 0"
+                                :class="(!prod.is_active || prod.is_expired || prod.effective_requires_prescription || prod.requires_prescription || prod.stock_quantity <= 0) 
+                                    ? 'opacity-60 bg-gray-100 cursor-not-allowed border-gray-200' 
+                                    : 'bg-white hover:border-teal-500 hover:shadow-md cursor-pointer'"
+                                class="p-3 rounded-xl border border-gray-200 transition-all text-left flex gap-3 h-36 relative overflow-hidden group">
+                            
+                            <div class="w-[90px] h-[90px] shrink-0 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden relative">
+                                <template x-if="prod.image">
+                                    <img :src="prod.image" class="w-full h-full object-contain" alt="Product Image">
+                                </template>
+                                <template x-if="!prod.image">
+                                    <i class='bx bx-plus-medical text-3xl text-gray-300'></i>
+                                </template>
+                            </div>
+
+                            <div class="flex-1 flex flex-col justify-between h-full overflow-hidden">
+                                <div class="w-full">
+                                    <div class="flex justify-between items-start gap-1">
+                                        <p class="font-semibold text-sm text-gray-800 leading-tight group-hover:text-teal-700 transition-colors line-clamp-2" x-text="prod.name"></p>
+                                        
+                                        <div class="flex flex-col gap-0.5 items-end shrink-0">
+                                            <span x-show="!prod.is_active" class="text-[8px] font-extrabold text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Inactive</span>
+                                            <span x-show="prod.is_expired" class="text-[8px] font-extrabold text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Expired</span>
+                                            <span x-show="prod.effective_requires_prescription || prod.requires_prescription" class="text-[8px] font-extrabold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Rx</span>
+                                            <span x-show="prod.stock_quantity <= 0 && prod.is_active && !prod.is_expired" class="text-[8px] font-extrabold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">OUT</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-400 mt-0.5" x-text="prod.base_unit"></p>
+                                </div>
+                                
+                                <div class="flex justify-between items-end mt-auto">
+                                    <p class="text-teal-700 font-extrabold text-base" x-text="'$' + parseFloat(prod.selling_price).toFixed(2)"></p>
+                                    <p class="text-[10px] text-gray-400 font-medium" x-text="prod.stock_quantity + ' left'"></p>
+                                </div>
+                            </div>
+                        </button>
+                    </template>
+                </div>
+                
+                <div x-show="isLoading" class="text-center text-teal-600 py-10 flex flex-col items-center justify-center">
+                    <i class='bx bx-loader-alt animate-spin text-4xl mb-2'></i>
+                    <p>Searching products...</p>
+                </div>
+                <div x-show="!isLoading && filteredProducts.length === 0" class="text-center text-gray-400 py-20 flex flex-col items-center justify-center">
+                    <i class='bx bx-package text-6xl mb-4 text-gray-300'></i>
+                    <p class="text-lg">No products found.</p>
+                </div>
+            </div>
+
+            <div x-show="selectedProduct"
+                x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-x-full" x-transition:enter-end="opacity-100 translate-x-0"
+                x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 -translate-x-full"
+                class="absolute inset-0 z-20 bg-white shadow-2xl flex flex-col h-full" style="display: none;">
+                
+                <div class="flex justify-between items-center p-5 border-b bg-gray-50 shrink-0">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <i class='bx bx-info-circle text-teal-600 text-2xl'></i> Product Information
+                    </h2>
+                    <button @click="selectedProduct = null" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition" aria-label="Close">
+                        <i class='bx bx-x text-2xl'></i>
+                    </button>
+                </div>
+
+                <template x-if="selectedProduct">
+                    <div class="flex flex-row flex-1 overflow-hidden p-6 gap-8">
+                        
+                        <div class="w-2/5 flex flex-col gap-5 border-r border-gray-100 pr-6">
+                            <div class="w-full aspect-square bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-center p-2 overflow-hidden shrink-0 shadow-inner relative">
+                                <template x-if="selectedProduct.image">
+                                    <img :src="selectedProduct.image" class="w-full h-full object-contain" alt="Product Image">
+                                </template>
+                                <template x-if="!selectedProduct.image">
+                                    <i class='bx bx-plus-medical text-7xl text-gray-300'></i>
+                                </template>
+                                
+                                <span x-show="selectedProduct.effective_requires_prescription" class="absolute top-3 left-3 bg-purple-100 text-purple-700 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm uppercase tracking-wider flex items-center gap-1">
+                                    <i class='bx bx-plus-medical'></i> Rx Only
+                                </span>
+                            </div>
+
+                            <div class="flex-1 overflow-y-auto hide-scrollbar space-y-4">
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Description</h4>
+                                    <p class="text-sm text-gray-600 leading-relaxed" x-text="selectedProduct.description || 'No detailed description available.'"></p>
+                                </div>
+                                
+                                <div x-show="selectedProduct.suppliers && selectedProduct.suppliers.length > 0">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Primary Supplier</h4>
+                                    <p class="text-sm text-gray-700 font-medium flex items-center gap-2">
+                                        <i class='bx bx-buildings text-gray-400'></i>
+                                        <span x-text="selectedProduct.suppliers[0]?.name"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 flex flex-col justify-between">
+                            <div>
+                                <div class="mb-6">
+                                    <div class="flex justify-between items-start">
+                                        <h3 class="text-3xl font-bold text-gray-900 leading-tight" x-text="selectedProduct.name"></h3>
+                                    </div>
+                                    
+                                    <div class="flex items-center gap-3 mt-2 text-sm text-gray-500 font-medium">
+                                        <span class="uppercase tracking-wider font-mono bg-gray-100 px-2 py-0.5 rounded" x-text="'Ref: #' + selectedProduct.id"></span>
+                                        <span x-text="selectedProduct.product_type?.name || 'Standard Product'"></span>
+                                    </div>
+
+                                    <div class="mt-2 text-xs text-gray-400 font-medium uppercase tracking-wider">Category</div>
+                                    <span class="block truncate text-sm text-gray-600 font-medium max-w-sm mt-0.5" 
+                                        :title="selectedProduct.category?.full_path" 
+                                        x-text="selectedProduct.category?.full_path || 'Uncategorized'">
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 mb-6">
+                                    <div class="bg-teal-50 border border-teal-100 p-4 rounded-xl shadow-sm flex flex-col justify-center">
+                                        <span class="text-xs font-bold text-teal-800 uppercase mb-1">Unit Price</span>
+                                        <span class="text-3xl font-extrabold text-teal-700" x-text="'$' + parseFloat(selectedProduct.selling_price).toFixed(2)"></span>
+                                    </div>
+
+                                    <div class="bg-gray-50 border border-gray-200 p-4 rounded-xl shadow-sm flex flex-col justify-center relative">
+                                        <span class="text-xs font-bold text-gray-600 uppercase mb-1">Available Stock</span>
+                                        <span class="text-3xl font-bold" :class="selectedProduct.stock_quantity <= 5 ? 'text-red-600' : 'text-gray-900'" x-text="selectedProduct.stock_quantity"></span>
+                                        <span class="absolute bottom-4 right-4 text-gray-400 text-sm font-medium" x-text="selectedProduct.base_unit + 's'"></span>
+                                    </div>
+                                </div>
+
+                                <div x-show="selectedProduct.expiration_date" class="p-3 rounded-lg border flex items-center gap-3" 
+                                    :class="selectedProduct.is_expired ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-600'">
+                                    <i class='bx bx-calendar-x text-2xl'></i>
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-wider opacity-80">Expiration Date</p>
+                                        <p class="font-semibold" x-text="selectedProduct.expiration_date"></p>
+                                    </div>
+                                    <span x-show="selectedProduct.is_expired" class="ml-auto font-extrabold uppercase tracking-wider text-sm bg-red-200 px-2 py-1 rounded">Expired</span>
+                                </div>
+                            </div>
+                            
+                            <button @click="addToCart(selectedProduct); selectedProduct = null;"
+                                    :disabled="selectedProduct.stock_quantity <= 0 || selectedProduct.is_expired"
+                                    class="w-full py-4 rounded-xl font-extrabold text-xl transition flex items-center justify-center space-x-2 shadow-lg active:scale-[0.98] mt-6"
+                                    :class="(selectedProduct.stock_quantity <= 0 || selectedProduct.is_expired) 
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' 
+                                            : 'bg-teal-600 text-white hover:bg-teal-700 shadow-teal-600/20'">
+                                <i class='bx bx-cart-add text-2xl'></i>
+                                <span x-text="(selectedProduct.stock_quantity <= 0) ? 'Out of Stock' : (selectedProduct.is_expired ? 'Cannot Sell Expired' : 'Add to Cart')"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="col-span-2 flex flex-col bg-white">
+            <div class="px-5 py-4 border-b font-bold text-gray-800 flex justify-between items-center bg-gray-50 shrink-0">
+                <span class="text-lg">Current Sale</span>
+                <span class="bg-teal-100 text-teal-800 py-1 px-3 rounded-full text-sm" x-text="cartCount + ' items'"></span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-5 space-y-3 hide-scrollbar">
+                <template x-for="(item, index) in cart" :key="item.id">
+                    <div class="flex items-center bg-gray-50 border border-gray-100 p-3 rounded-xl hover:shadow-sm transition-shadow group">
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800 leading-tight" x-text="item.name"></p>
+                            <p class="text-sm text-gray-500 mt-0.5" x-text="'$' + parseFloat(item.price).toFixed(2) + ' each'"></p>
+                        </div>
+
+                        <div class="flex items-center space-x-1 mx-3 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+                            <button @click="updateQty(index, -1)" class="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-600 transition"><i class='bx bx-minus'></i></button>
+                            <input type="number" x-model.number="item.qty" @change="validateQty(index)" class="w-10 text-center font-bold text-gray-800 focus:outline-none bg-transparent">
+                            <button @click="updateQty(index, 1)" class="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-600 transition"><i class='bx bx-plus'></i></button>
+                        </div>
+
+                        <p class="w-20 text-right font-bold text-teal-700 text-lg" x-text="'$' + (item.price * item.qty).toFixed(2)"></p>
+
+                        <button @click="removeFromCart(index)" class="ml-3 text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition" title="Remove Item">
+                            <i class='bx bx-trash text-xl'></i>
+                        </button>
+                    </div>
+                </template>
+
+                <div x-show="cart.length === 0" class="text-center text-gray-400 mt-24">
+                    <i class='bx bx-cart text-7xl mb-4 text-gray-200'></i>
+                    <p class="text-lg">Cart is empty</p>
+                </div>
+            </div>
+
+            <div class="border-t p-5 bg-gray-50 shrink-0">
+                <div class="flex justify-between items-center mb-5">
+                    <span class="text-xl font-bold text-gray-700">TOTAL:</span>
+                    <span class="text-4xl font-extrabold text-teal-700" x-text="'$' + cartTotal.toFixed(2)"></span>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button @click="clearCart()" class="w-1/3 bg-white border border-gray-300 text-gray-700 py-3.5 rounded-xl hover:bg-gray-100 font-semibold transition shadow-sm">Clear Cart</button>
+                    
+                    <button @click="showConfirmCheckout = true"
+                            class="w-2/3 bg-teal-600 text-white py-3.5 rounded-xl hover:bg-teal-700 font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg shadow-teal-600/20 transition"
+                            :disabled="cart.length === 0">
+                        <i class='bx bx-shopping-bag text-xl mr-2'></i>
+                        <span>Checkout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showConfirmCheckout" style="display: none;"
+         x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm">
+        
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 transform transition-all" @click.away="!isProcessing ? showConfirmCheckout = false : null">
+            
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-teal-100 mb-5">
+                <i class='bx bx-wallet text-3xl text-teal-600'></i>
+            </div>
+
+            <h3 class="text-center text-xl font-bold text-gray-900 mb-1">Finalize Sale</h3>
+            <p class="text-center text-sm text-gray-500 mb-6">Select payment method to complete.</p>
+
+            <select x-model="paymentMethod" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-700 font-medium mb-5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none">
+                <option value="cash">Cash</option>
+                <option value="card">Card / POS</option>
+                <option value="insurance">Insurance Claim</option>
+            </select>
+
+            <div class="bg-gray-50 rounded-xl p-4 text-center mb-8 border border-gray-100">
+                <p class="text-sm text-gray-500 uppercase tracking-wider font-bold mb-1">Amount Due</p>
+                <p class="text-4xl font-extrabold text-teal-700" x-text="'$' + cartTotal.toFixed(2)"></p>
+            </div>
+
+            <div x-show="checkoutError" class="bg-red-50 text-red-600 border border-red-200 p-3 rounded-lg text-sm mb-5 text-center font-medium" x-text="checkoutError"></div>
+
+            <div class="flex space-x-3">
+                <button @click="showConfirmCheckout = false" :disabled="isProcessing" class="flex-1 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition disabled:opacity-50">Cancel</button>
+                <button @click="processCheckout()" :disabled="isProcessing" class="flex-1 bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 disabled:opacity-70 flex items-center justify-center transition shadow-md shadow-teal-600/20">
+                    <i x-show="isProcessing" class='bx bx-loader-alt animate-spin text-xl mr-2'></i>
+                    <i x-show="!isProcessing" class='bx bx-check-shield text-xl mr-2'></i>
+                    <span x-text="isProcessing ? 'Processing' : 'Confirm'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showSuccess" style="display: none;"
+         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
+         class="fixed bottom-8 right-8 bg-white border border-gray-100 px-6 py-5 rounded-2xl shadow-2xl z-50 flex items-center gap-6 max-w-md w-full">
+        
+        <div class="flex items-center gap-4 flex-1">
+            <div class="bg-green-100 p-3 rounded-full shrink-0">
+                <i class='bx bx-check text-3xl text-green-600'></i>
+            </div>
+            <div>
+                <p class="font-extrabold text-gray-900 text-lg">Sale Completed!</p>
+                <p class="text-sm text-gray-500 font-mono mt-0.5" x-text="'Receipt #' + lastSaleNumber"></p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2 border-l border-gray-200 pl-6 shrink-0">
+            <button @click="printReceipt()" class="bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-800 px-4 py-2.5 rounded-lg text-sm font-bold flex items-center space-x-1.5 transition">
+                <i class='bx bx-printer text-lg'></i>
+                <span>Print</span>
+            </button>
+            <button @click="closeSuccessAndReset()" class="text-gray-400 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition" title="Close & New Sale">
+                <i class='bx bx-x text-2xl'></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="thermal-receipt hidden" id="thermal-receipt">
+        <div class="text-center mb-2">
+            <p class="font-bold text-base">AETERNA PHARMACY</p>
+            <p class="text-xs">---</p>
+        </div>
+
+        <div class="divider"></div>
+        <p class="text-xs">Date: <span id="receipt-date"></span></p>
+        <p class="text-xs">Receipt #: <span id="receipt-number" class="font-bold"></span></p>
+        <p class="text-xs">Cashier: {{ request.session.username }}</p>
+        <div class="divider"></div>
+        <div class="divider"></div>
+
+        <table style="width: 100%; font-size: 11px;">
+            <thead>
+                <tr style="border-bottom: 1px solid #000;">
+                    <th style="text-align:left;">Item</th>
+                    <th style="text-align:center;">Qty</th>
+                    <th style="text-align:right;">Total</th>
+                </tr>
+            </thead>
+            <tbody id="receipt-items">
+                </tbody>
+        </table>
+
+        <div class="divider"></div>
+        <div style="text-align: right; font-size: 16px; font-weight: bold;">
+            TOTAL: $<span id="receipt-total"></span>
+        </div>
+        <div class="divider"></div>
+        <p class="text-center text-xs">Thank you for your purchase!</p>
+    </div>
+
+    <div x-show="showHistoryModal" style="display: none;"
+        x-transition.opacity
+        class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm">
+        
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col transform transition-all" @click.away="showHistoryModal = false">
+            
+            <div class="flex justify-between items-center p-6 border-b border-gray-100 shrink-0">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class='bx bx-receipt text-teal-600 text-2xl'></i> My Sales Today
+                </h2>
+                <button @click="showHistoryModal = false" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition">
+                    <i class='bx bx-x text-2xl'></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 bg-gray-50 hide-scrollbar">
+                
+                <div x-show="isLoadingHistory" class="flex flex-col items-center justify-center py-12 text-teal-600">
+                    <i class='bx bx-loader-alt animate-spin text-4xl mb-3'></i>
+                    <p class="font-medium">Fetching your sales...</p>
+                </div>
+
+                <div x-show="historyError" class="bg-red-50 text-red-600 p-4 rounded-xl text-center font-medium" x-text="historyError"></div>
+
+                <div x-show="!isLoadingHistory && salesHistory.length === 0 && !historyError" class="text-center text-gray-400 py-12">
+                    <i class='bx bx-history text-6xl mb-4 text-gray-300'></i>
+                    <p class="text-lg">No sales recorded yet.</p>
+                </div>
+
+                <div x-show="!isLoadingHistory && salesHistory.length > 0" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full text-left text-sm text-gray-600">
+                        <thead class="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold text-xs">
+                            <tr>
+                                <th class="px-5 py-4">Time</th>
+                                <th class="px-5 py-4">Receipt #</th>
+                                <th class="px-5 py-4">Method</th>
+                                <th class="px-5 py-4 text-center">Items</th>
+                                <th class="px-5 py-4 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <template x-for="sale in salesHistory" :key="sale.id">
+                                <tr class="hover:bg-teal-50/50 transition-colors group">
+                                    <td class="px-5 py-4 whitespace-nowrap" x-text="formatDate(sale.created_at)"></td>
+                                    <td class="px-5 py-4 font-mono font-medium text-gray-900" x-text="sale.sale_number"></td>
+                                    <td class="px-5 py-4">
+                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider"
+                                            :class="sale.payment_method === 'cash' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'"
+                                            x-text="sale.payment_method"></span>
+                                    </td>
+                                    <td class="px-5 py-4 text-center text-gray-500" x-text="sale.items ? sale.items.length : 0"></td>
+                                    <td class="px-5 py-4 text-right font-bold text-teal-700" x-text="'$' + parseFloat(sale.total_amount).toFixed(2)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function posApp() {
+            return {
+                token: "{{ request.session.token }}",
+
+                searchQuery: '',
+                filteredProducts: [],
+                isLoading: false,
+                cart: [],
+                selectedProduct: null,
+                
+                // Checkout State
+                paymentMethod: 'cash',
+                showConfirmCheckout: false,
+                showSuccess: false,
+                isProcessing: false,
+                checkoutError: '',
+                
+                // Receipt State
+                lastSaleNumber: '',
+                lastCartSnapshot: [],
+
+                // History Modal State
+                showHistoryModal: false,
+                salesHistory: [],
+                isLoadingHistory: false,
+                historyError: '',
+
+                init() {
+                    this.loadCart();
+                    this.searchProducts();
+                },
+
+                async openHistoryModal() {
+                    this.showHistoryModal = true;
+                    this.isLoadingHistory = true;
+                    this.historyError = '';
+                    
+                    try {
+                        // Build headers dynamically and attach the token
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (this.token) {
+                            headers['Authorization'] = `Token ${this.token}`; // Change to `Bearer ${this.token}` if using JWT
+                        }
+
+                        const res = await fetch('/api/sales/my_sales/', { 
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: headers // <-- Attach the headers containing the authorization token
+                        });
+                        const data = await res.json();
+                        
+                        if (res.ok) {
+                            // DRF might return an array directly, or paginated inside 'results'
+                            this.salesHistory = Array.isArray(data) ? data : (data.results || []);
+                        } else {
+                            this.historyError = data.detail || 'Failed to load sales history.';
+                        }
+                    } catch (e) {
+                        this.historyError = 'Network error loading history.';
+                        console.error(e);
+                    } finally {
+                        this.isLoadingHistory = false;
+                    }
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    // Formats to something like "3:45 PM"
+                    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                },
+
+                async searchProducts() {
+                    this.isLoading = true;
+                    try {
+                        const url = this.searchQuery.length > 0 
+                            ? `/api/products/?search=${this.searchQuery}&page_size=30`
+                            : `/api/products/?page_size=20`;
+                            
+                        // Build the headers dynamically
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (this.token) {
+                            // Change 'Token' to 'Bearer' if you are using JWT instead of DRF Authtoken
+                            headers['Authorization'] = `Token ${this.token}`; 
+                        }
+
+                        const res = await fetch(url, {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: headers // <-- Pass the headers here
+                        });
+                        const data = await res.json();
+                        this.filteredProducts = data.results || [];
+                    } catch (e) {
+                        console.error("Failed to load products:", e);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                openProductDetails(product) {
+                    if (product.stock_quantity > 0) {
+                        this.selectedProduct = product;
+                    }
+                },
+
+                addToCart(product) {
+                    if (product.stock_quantity <= 0) return;
+                    
+                    const existingIndex = this.cart.findIndex(i => i.id === product.id);
+                    if (existingIndex > -1) {
+                        if (this.cart[existingIndex].qty < product.stock_quantity) {
+                            this.cart[existingIndex].qty++;
+                        }
+                    } else {
+                        this.cart.push({
+                            id: product.id,
+                            name: product.name,
+                            price: parseFloat(product.selling_price),
+                            qty: 1,
+                            maxStock: product.stock_quantity,
+                            requiresRx: product.effective_requires_prescription
+                        });
+                    }
+                    this.saveCart();
+                },
+
+                updateQty(index, delta) {
+                    const item = this.cart[index];
+                    const newQty = item.qty + delta;
+                    if (newQty > 0 && newQty <= item.maxStock) {
+                        item.qty = newQty;
+                        this.saveCart();
+                    }
+                },
+
+                validateQty(index) {
+                    const item = this.cart[index];
+                    if (item.qty <= 0) item.qty = 1;
+                    if (item.qty > item.maxStock) item.qty = item.maxStock;
+                    this.saveCart();
+                },
+
+                removeFromCart(index) {
+                    this.cart.splice(index, 1);
+                    this.saveCart();
+                },
+
+                clearCart() {
+                    this.cart = [];
+                    this.saveCart();
+                },
+
+                get cartTotal() {
+                    return this.cart.reduce((sum, item) => sum + (item.qty * item.price), 0);
+                },
+
+                get cartCount() {
+                    return this.cart.reduce((count, item) => count + item.qty, 0);
+                },
+
+                async processCheckout() {
+                    this.isProcessing = true;
+                    this.checkoutError = '';
+
+                    const payload = {
+                        items: this.cart.map(item => ({ product_id: item.id, quantity: item.qty })),
+                        payment_method: this.paymentMethod
+                    };
+
+                    try {
+                        const csrftoken = getCookie('csrftoken');
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        };
+                        if (this.token) {
+                            headers['Authorization'] = `Token ${this.token}`;
+                        }
+
+                        const res = await fetch('/api/sales/checkout/', {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: headers,
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+
+                        if (res.status === 201 || res.status === 200) {
+                            // Save success state
+                            this.lastSaleNumber = data.sale_number || data.id || 'N/A';
+                            this.lastCartSnapshot = JSON.parse(JSON.stringify(this.cart));
+                            
+                            // Adjust UI Stock instantly
+                            this.cart.forEach(cartItem => {
+                                let gridProd = this.filteredProducts.find(p => p.id === cartItem.id);
+                                if (gridProd) gridProd.stock_quantity -= cartItem.qty;
+                            });
+
+                            this.showConfirmCheckout = false;
+                            this.clearCart();
+                            this.showSuccess = true;
+                        } else {
+                            this.checkoutError = data.error || data.detail || "Failed to process sale.";
+                        }
+                    } catch (e) {
+                        this.checkoutError = "Network error. Please try again.";
+                    } finally {
+                        this.isProcessing = false;
+                    }
+                },
+
+                closeSuccessAndReset() {
+                    this.showSuccess = false;
+                },
+
+                printReceipt() {
+                    let snapshotTotal = this.lastCartSnapshot.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                    
+                    document.getElementById('receipt-date').innerText = new Date().toLocaleString();
+                    document.getElementById('receipt-number').innerText = this.lastSaleNumber;
+                    document.getElementById('receipt-total').innerText = snapshotTotal.toFixed(2);
+                    
+                    let itemsHtml = '';
+                    this.lastCartSnapshot.forEach(item => {
+                        itemsHtml += `
+                            <tr>
+                                <td style="max-width: 120px; overflow: hidden; white-space: nowrap;">${item.name}</td>
+                                <td style="text-align:center;">${item.qty}</td>
+                                <td style="text-align:right;">$${(item.price * item.qty).toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
+                    document.getElementById('receipt-items').innerHTML = itemsHtml;
+                    
+                    const receipt = document.getElementById('thermal-receipt');
+                    receipt.classList.remove('hidden');
+                    window.print();
+                    setTimeout(() => receipt.classList.add('hidden'), 500);
+                },
+
+                // LocalStorage Persistence
+                saveCart() { localStorage.setItem('pos_cart', JSON.stringify(this.cart)); },
+                loadCart() {
+                    const saved = localStorage.getItem('pos_cart');
+                    if (saved) { try { this.cart = JSON.parse(saved); } catch(e) { this.cart = []; } }
+                }
+            }
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>

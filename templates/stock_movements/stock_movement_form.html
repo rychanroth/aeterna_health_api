@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block title %}Record Stock Movement{% endblock %}
+{% block page_title %}Record Stock Movement{% endblock %}
+
+{% block content %}
+<!-- Safely inject data for Alpine.js -->
+{{ products|json_script:"products-data" }}
+{{ suppliers|json_script:"suppliers-data" }}
+{{ old_input|json_script:"old-input-data" }}
+
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl border border-slate-200 shadow-sm" x-data="movementForm()">
+    
+    <div class="flex items-center gap-2 mb-6">
+        <a href="{% url 'template-stock-movement-list' %}" class="text-gray-400 hover:text-gray-900 transition p-1.5 rounded-lg hover:bg-gray-100">
+            <i class='bx bx-arrow-back text-xl'></i>
+        </a>
+        <div>
+            <span class="text-[10px] font-bold tracking-widest uppercase transition-colors duration-300"
+                  :class="isStockIn ? 'text-emerald-500' : 'text-rose-500'">
+                Inventory Ledger
+            </span>
+            <h1 class="text-2xl font-black text-gray-900 tracking-tight">Record Movement</h1>
+        </div>
+    </div>
+
+    <div class="p-4 mb-8 text-sm flex items-start gap-3 shadow-sm rounded-xl border transition-colors duration-300"
+         :class="isStockIn ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'">
+        <i class='bx text-xl mt-0.5' :class="isStockIn ? 'bx-check-shield' : 'bx-error-circle'"></i>
+        <div>
+            <p class="font-bold">Immutable Record</p>
+            <p x-text="isStockIn ? 'You are adding stock to the inventory. Verify quantities and costs carefully before committing.' : 'You are removing stock from the inventory. This action is permanent and cannot be undone.'"></p>
+        </div>
+    </div>
+
+    <form method="POST" class="space-y-6">
+        {% csrf_token %}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Movement Reason <span class="text-rose-500">*</span></label>
+                <select name="movement_type" x-model="type" required
+                        class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-900 font-medium focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all cursor-pointer">
+                    <optgroup label="Stock In (Addition)">
+                        <option value="purchase">Purchase (Supplier)</option>
+                        <option value="return_customer">Return from Customer</option>
+                        <option value="adjustment_in">Adjustment (In)</option>
+                    </optgroup>
+                    <optgroup label="Stock Out (Deduction)">
+                        <option value="expired">Expired</option>
+                        <option value="damaged">Damaged</option>
+                        <option value="return_supplier">Return to Supplier</option>
+                        <option value="adjustment_out">Adjustment (Out)</option>
+                    </optgroup>
+                </select>
+                <p class="text-[11px] text-gray-400 mt-1.5 font-medium">Note: 'Sale' movements are automated via POS.</p>
+                {% if errors.movement_type %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.movement_type.0 }}</p>{% endif %}
+            </div>
+
+            <div class="relative" @click.away="productOpen = false">
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Target Product <span class="text-rose-500">*</span></label>
+                
+                <input type="hidden" name="product_id" :value="selectedProductId" required>
+                
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                        <i class='bx bx-search text-lg'></i>
+                    </div>
+                    <input type="text" x-model="searchProduct" @focus="productOpen = true" placeholder="Search by name or ID..."
+                           class="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white text-gray-900 font-medium focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all placeholder-gray-400">
+                    
+                    <button type="button" x-show="selectedProductId" @click="clearProduct()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-rose-500 transition">
+                        <i class='bx bx-x-circle text-lg'></i>
+                    </button>
+                </div>
+
+                <ul x-show="productOpen" x-transition class="absolute z-20 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
+                    <template x-for="prod in filteredProducts" :key="prod.id">
+                        <li @click="selectProduct(prod)" 
+                            class="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group">
+                            <div>
+                                <p class="text-sm font-bold text-gray-900 group-hover:text-slate-700" x-text="prod.name"></p>
+                                <p class="text-xs text-gray-400" x-text="'ID: ' + prod.id"></p>
+                            </div>
+                            <span class="text-xs font-bold px-2 py-1 rounded-md"
+                                  :class="prod.stock_quantity > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'"
+                                  x-text="'Stock: ' + prod.stock_quantity"></span>
+                        </li>
+                    </template>
+                    <li x-show="filteredProducts.length === 0" class="px-4 py-3 text-sm text-gray-500 text-center">No products found.</li>
+                </ul>
+                {% if errors.product_id %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.product_id.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Quantity <span class="text-rose-500">*</span></label>
+                <input type="number" name="quantity" min="1" x-model="quantity" required
+                       class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 focus:bg-white text-gray-900 font-bold text-lg focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all">
+                {% if errors.quantity %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.quantity.0 }}</p>{% endif %}
+            </div>
+
+            <div x-show="isStockIn" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Unit Cost</label>
+                <div class="relative">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                    <input type="number" step="0.01" name="unit_cost" x-model="unitCost" placeholder="0.00"
+                           class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 bg-gray-50 focus:bg-white text-gray-900 font-bold focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all">
+                </div>
+                {% if errors.unit_cost %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.unit_cost.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <div x-show="isStockIn" class="relative" @click.away="supplierOpen = false" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Source Supplier</label>
+            <input type="hidden" name="supplier_id" :value="selectedSupplierId">
+            
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <i class='bx bx-buildings text-lg'></i>
+                </div>
+                <input type="text" x-model="searchSupplier" @focus="supplierOpen = true" placeholder="Search suppliers (Optional)..."
+                       class="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white text-gray-900 font-medium focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all placeholder-gray-400">
+                
+                <button type="button" x-show="selectedSupplierId" @click="clearSupplier()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-rose-500 transition">
+                    <i class='bx bx-x-circle text-lg'></i>
+                </button>
+            </div>
+
+            <ul x-show="supplierOpen" x-transition class="absolute z-20 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                <template x-for="sup in filteredSuppliers" :key="sup.id">
+                    <li @click="selectSupplier(sup)" class="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
+                        <p class="text-sm font-bold text-gray-900" x-text="sup.name"></p>
+                    </li>
+                </template>
+                <li x-show="filteredSuppliers.length === 0" class="px-4 py-3 text-sm text-gray-500 text-center">No suppliers found.</li>
+            </ul>
+            {% if errors.supplier_id %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.supplier_id.0 }}</p>{% endif %}
+        </div>
+
+        <div>
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Reference Number</label>
+            <input type="text" name="reference" x-model="reference" placeholder="e.g., PO-12345 or Invoice #"
+                   class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 focus:bg-white text-gray-900 focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all placeholder-gray-400">
+        </div>
+
+        <div>
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Internal Notes</label>
+            <textarea name="notes" rows="2" x-model="notes" placeholder="Reason for adjustment, damage details, etc..."
+                      class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 focus:bg-white text-gray-900 focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all placeholder-gray-400 resize-none"></textarea>
+        </div>
+
+        <div class="pt-6 mt-6 border-t border-gray-100 flex items-center justify-end gap-4">
+            <a href="{% url 'template-stock-movement-list' %}" class="px-6 py-3 rounded-xl text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 transition">Cancel</a>
+            <button type="submit" 
+                    class="px-8 py-3 rounded-xl text-sm font-bold text-white active:scale-[0.98] shadow-lg transition-all flex items-center gap-2"
+                    :class="isStockIn ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'">
+                <i class='bx' :class="isStockIn ? 'bx-check-shield' : 'bx-minus-circle'"></i>
+                <span x-text="isStockIn ? 'Commit Stock In' : 'Commit Stock Out'"></span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>
+
+<script>
+    function movementForm() {
+        return {
+            type: 'purchase',
+            
+            // Models for standard inputs (ensures old_input repopulation if implemented via init)
+            quantity: '',
+            unitCost: '',
+            reference: '',
+            notes: '',
+
+            // Product State
+            products: [],
+            searchProduct: '',
+            productOpen: false,
+            selectedProductId: '',
+            
+            // Supplier State
+            suppliers: [],
+            searchSupplier: '',
+            supplierOpen: false,
+            selectedSupplierId: '',
+
+            init() {
+                // 1. Safely parse data injected by Django's json_script
+                const pEl = document.getElementById('products-data');
+                if (pEl) this.products = JSON.parse(pEl.textContent);
+                
+                const sEl = document.getElementById('suppliers-data');
+                if (sEl) this.suppliers = JSON.parse(sEl.textContent);
+
+                const oldEl = document.getElementById('old-input-data');
+                const oldInput = oldEl ? JSON.parse(oldEl.textContent) : {};
+
+                // 2. Restore state if validation failed
+                if (oldInput.movement_type) this.type = oldInput.movement_type;
+                if (oldInput.quantity) this.quantity = oldInput.quantity;
+                if (oldInput.unit_cost) this.unitCost = oldInput.unit_cost;
+                if (oldInput.reference) this.reference = oldInput.reference;
+                if (oldInput.notes) this.notes = oldInput.notes;
+
+                if (oldInput.product_id) {
+                    this.selectedProductId = oldInput.product_id;
+                    const prod = this.products.find(p => String(p.id) === String(oldInput.product_id));
+                    if (prod) this.searchProduct = prod.name;
+                }
+                if (oldInput.supplier_id) {
+                    this.selectedSupplierId = oldInput.supplier_id;
+                    const sup = this.suppliers.find(s => String(s.id) === String(oldInput.supplier_id));
+                    if (sup) this.searchSupplier = sup.name;
+                }
+            },
+
+            // Computed
+            get isStockIn() {
+                return ['purchase', 'return_customer', 'adjustment_in'].includes(this.type);
+            },
+            
+            // Filtering
+            get filteredProducts() {
+                if (this.searchProduct === '' || (this.selectedProductId && this.products.find(p => p.name === this.searchProduct))) {
+                    return this.products;
+                }
+                const lower = this.searchProduct.toLowerCase();
+                return this.products.filter(p => p.name.toLowerCase().includes(lower) || String(p.id).includes(lower));
+            },
+            
+            get filteredSuppliers() {
+                if (this.searchSupplier === '' || (this.selectedSupplierId && this.suppliers.find(s => s.name === this.searchSupplier))) {
+                    return this.suppliers;
+                }
+                return this.suppliers.filter(s => s.name.toLowerCase().includes(this.searchSupplier.toLowerCase()));
+            },
+
+            // Actions
+            selectProduct(prod) {
+                this.selectedProductId = prod.id;
+                this.searchProduct = prod.name;
+                this.productOpen = false;
+            },
+            clearProduct() {
+                this.selectedProductId = '';
+                this.searchProduct = '';
+                setTimeout(() => this.productOpen = true, 50); 
+            },
+            
+            selectSupplier(sup) {
+                this.selectedSupplierId = sup.id;
+                this.searchSupplier = sup.name;
+                this.supplierOpen = false;
+            },
+            clearSupplier() {
+                this.selectedSupplierId = '';
+                this.searchSupplier = '';
+                setTimeout(() => this.supplierOpen = true, 50);
+            }
+        }
+    }
+</script>
+{% endblock %}

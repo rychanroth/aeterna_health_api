@@ -1,55 +1,194 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Aeterna Health{% endblock %}</title>
+    
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/output.css' %}">
-</head>
-<body class="bg-gray-100 min-h-screen flex relative">
     
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-green-800 text-white sticky top-0 h-screen">
-        <div class="p-4 text-xl font-bold border-b border-gray-700">
-            Aeterna Health
-        </div>
-        <nav class="p-4 space-y-2">
-            <a href="{% url 'home' %}" class="block py-2 px-3 rounded hover:bg-gray-700">Dashboard</a>
-            
-            <!-- We will add role-based links here in the future -->
-        </nav>
-    </aside>
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
 
-    <!-- MAIN AREA -->
-    <div class="flex-1 flex flex-col">
+<body class="bg-gray-50 min-h-screen flex text-gray-800 font-sans antialiased overflow-hidden">
+
+    {% if request.session.role == 'admin' or request.session.role == 'pharmacist' %}
+    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen sticky top-0 shrink-0 border-r border-slate-800 shadow-xl z-20">
         
-        <!-- TOP BAR -->
-        <header class="bg-white shadow p-4 flex justify-between items-center">
-            <h1 class="text-lg font-semibold">{% block page_title %}Page{% endblock %}</h1>
-            <div class="flex items-center gap-4">
-                <span class="text-gray-600 text-sm">{{ request.session.username }} ({{ request.session.role }})</span>
-                <a href="{% url 'template_logout' %}" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Logout</a>
+        <div class="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-950/50">
+            <div class="w-8 h-8 bg-teal-500/20 text-teal-400 rounded-lg flex items-center justify-center mr-3 border border-teal-500/30">
+                <i class='bx bx-plus-medical text-sm'></i>
+            </div>
+            <span class="text-lg font-bold text-white tracking-wide">Aeterna Health</span>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+            
+            <div class="space-y-1">
+                <a href="{% url 'home' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors group">
+                    <i class='bx bx-grid-alt text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i>
+                    Dashboard
+                </a>
+            </div>
+
+            {% if request.session.role == 'admin' %}
+            <div>
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-3">Administration</div>
+                <div class="space-y-1">
+                    <a href="{% url 'template-user-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-user-pin text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Users
+                    </a>
+                    <a href="{% url 'template-supplier-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-buildings text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Suppliers
+                    </a>
+                    <a href="{% url 'template-reports-dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-bar-chart-alt-2 text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Reports
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <div>
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-3">Inventory Matrix</div>
+                <div class="space-y-1">
+                    <a href="{% url 'template-product-type-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-category text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Product Types
+                    </a>
+                    <a href="{% url 'template-category-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-folder-open text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Categories
+                    </a>
+                    <a href="{% url 'template-product-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-package text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Products
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-3">Clinical Ops</div>
+                <div class="space-y-1">
+                    <a href="{% url 'template-prescription-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-capsule text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Prescriptions
+                    </a>
+                    <a href="{% url 'template-doctor-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-plus-medical text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Doctors
+                    </a>
+                    <a href="{% url 'template-patient-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-user text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Patients
+                    </a>
+                </div>
+            </div>
+            
+            <div class="pb-6">
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-3">Logistics</div>
+                <div class="space-y-1">
+                    <a href="{% url 'template-sale-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-receipt text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Sales History
+                    </a>
+                    <a href="{% url 'template-stock-movement-list' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition group">
+                        <i class='bx bx-transfer-alt text-lg text-slate-500 group-hover:text-teal-400 transition-colors'></i> Stock Movements
+                    </a>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="p-4 border-t border-slate-800 bg-slate-950/30">
+            <div class="flex items-center gap-3 px-3 py-2">
+                <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 border border-slate-700">
+                    <i class='bx bxs-badge-check'></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-medium capitalize">{{ request.session.role }}</p>
+                    <p class="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Access Level</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+    {% endif %}
+
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+
+        <header class="h-16 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-8 shrink-0 z-10">
+            <h1 class="text-lg font-black text-gray-900 tracking-tight">{% block page_title %}Overview{% endblock %}</h1>
+            
+            <div class="flex items-center gap-5">
+                
+                <div class="flex items-center gap-3 border-r border-gray-200 pr-5">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-sm font-bold text-gray-900 leading-none">{{ request.session.username }}</p>
+                        <p class="text-[10px] font-bold text-teal-600 uppercase tracking-wider mt-1">{{ request.session.role }}</p>
+                    </div>
+                    <a href="{% url 'template-user-me' %}" class="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center text-gray-500 transition">
+                        <i class='bx bx-user text-lg'></i>
+                    </a>
+                </div>
+
+                <a href="{% url 'template-logout' %}" class="flex items-center gap-1.5 text-sm font-bold text-rose-600 hover:text-rose-700 transition">
+                    <i class='bx bx-log-out-circle text-lg'></i>
+                    <span class="hidden sm:inline">Logout</span>
+                </a>
             </div>
         </header>
 
-        <!-- MESSAGES (Errors/Success) -->
-        {% if messages %}
-            <div class="p-4">
+        <main class="flex-1 overflow-y-auto bg-gray-50 relative">
+            
+            {% if messages %}
+            <div class="absolute top-4 right-8 z-50 flex flex-col gap-2 min-w-[320px]">
                 {% for message in messages %}
-                    <div class="bg-red-100 text-red-700 p-3 rounded mb-2">
+                <div x-data="{ show: true }" x-show="show" x-transition.opacity.duration.300ms
+                     class="flex items-start gap-3 p-4 rounded-xl border shadow-lg backdrop-blur-sm 
+                        {% if message.tags == 'error' %}bg-rose-50/90 border-rose-200 text-rose-800
+                        {% elif message.tags == 'success' %}bg-emerald-50/90 border-emerald-200 text-emerald-800
+                        {% else %}bg-blue-50/90 border-blue-200 text-blue-800{% endif %}">
+                    
+                    <div class="flex-shrink-0 mt-0.5">
+                        {% if message.tags == 'error' %}
+                            <i class='bx bxs-error-circle text-xl text-rose-500'></i>
+                        {% elif message.tags == 'success' %}
+                            <i class='bx bxs-check-circle text-xl text-emerald-500'></i>
+                        {% else %}
+                            <i class='bx bxs-info-circle text-xl text-blue-500'></i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex-1 text-sm font-medium">
                         {{ message }}
                     </div>
+
+                    <button @click="show = false" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition">
+                        <i class='bx bx-x text-xl'></i>
+                    </button>
+                </div>
                 {% endfor %}
             </div>
-        {% endif %}
+            {% endif %}
 
-        <!-- CONTENT INJECTION POINT -->
-        <main class="p-8">
-            {% block content %}
-            <!-- Child templates fill this space -->
-            {% endblock %}
+            <div class="p-4 sm:p-6 lg:p-8">
+                {% block content %}
+                {% endblock %}
+            </div>
+            
         </main>
 
     </div>
 
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
 </body>
 </html>

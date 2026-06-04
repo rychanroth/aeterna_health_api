@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Receipt: {{ sale.sale_number }}{% endblock %}
+{% block page_title %}Sale Receipt{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex justify-between items-center">
+    <a href="{% url 'template-sale-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Sales History</a>
+    <button onclick="window.print()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-200 text-sm flex items-center gap-1">
+        <i class='bx bx-printer'></i> Print Receipt
+    </button>
+</div>
+
+<!-- Receipt Container -->
+<div class="max-w-2xl mx-auto bg-white border border-gray-200 rounded shadow-sm p-8">
+    
+    <!-- Header -->
+    <div class="text-center border-b pb-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">AETERNA HEALTH</h2>
+        <p class="text-sm text-gray-500">Pharmacy Management System</p>
+        <div class="mt-4">
+            <h3 class="text-xl font-bold text-green-700">{{ sale.sale_number }}</h3>
+            <p class="text-sm text-gray-600">{{ sale.created_at|date:"F j, Y, g:i a" }}</p>
+            <p class="text-sm text-gray-500">Cashier: {{ sale.cashier_name|default:"System" }}</p>
+        </div>
+    </div>
+
+    <!-- Prescription Link -->
+    {% if sale.prescription %}
+    <div class="bg-purple-50 border border-purple-200 rounded p-3 mb-6 text-sm flex items-center gap-2">
+        <i class='bx bx-file text-purple-600 text-lg'></i>
+        <div>
+            <p class="font-bold text-purple-800">Linked Prescription</p>
+            <p class="text-purple-700">Rx ID: {{ sale.prescription }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Items Table -->
+    <table class="w-full text-left border-collapse mb-6">
+        <thead>
+            <tr class="border-b text-gray-600 text-sm">
+                <th class="pb-2 font-semibold">Item</th>
+                <th class="pb-2 font-semibold text-right">Qty</th>
+                <th class="pb-2 font-semibold text-right">Unit Price</th>
+                <th class="pb-2 font-semibold text-right">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in sale.items %}
+            <tr class="border-b border-dashed text-sm">
+                <td class="py-3 text-gray-800 font-medium">{{ item.product_name }}</td>
+                <td class="py-3 text-gray-800 text-right">{{ item.quantity }}</td>
+                <td class="py-3 text-gray-600 text-right">$ {{ item.unit_price|floatformat:2 }}</td>
+                <td class="py-3 text-gray-800 text-right font-medium">$ {{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="py-4 text-center text-gray-500">No items in this sale.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Totals Section -->
+    <div class="flex justify-end mb-6">
+        <div class="w-64">
+            <div class="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Payment Method:</span>
+                <span class="capitalize font-medium">{{ sale.payment_method }}</span>
+            </div>
+            <div class="flex justify-between text-lg font-bold border-t-2 border-gray-800 pt-2 text-gray-900">
+                <span>TOTAL PAID:</span>
+                <span>$ {{ sale.total_amount|floatformat:2 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    {% if sale.notes %}
+    <div class="bg-gray-50 p-3 rounded text-sm text-gray-700 mt-4 border border-gray-100">
+        <strong class="text-gray-800">Notes:</strong> {{ sale.notes }}
+    </div>
+    {% endif %}
+
+    <!-- Audit Trail Footer -->
+    <div class="mt-8 text-center text-xs text-gray-400 border-t pt-4">
+        <p>This is an immutable audit record. Sale #{{ sale.sale_number }} cannot be edited or deleted.</p>
+    </div>
+</div>
+{% endblock %}
