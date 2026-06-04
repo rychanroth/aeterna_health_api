@@ -60,7 +60,6 @@ def product_create(request):
             'product_type_id': old_input.get('product_type_id') or None,
             'requires_prescription': old_input['requires_prescription'],
             'is_active': old_input['is_active'],
-            # M2M: Convert list of string IDs to list of integers
             'supplier_ids': [int(sid) for sid in request.POST.getlist('supplier_ids') if sid],
         }
 
@@ -74,16 +73,14 @@ def product_create(request):
             errors = response.json()
         else:
             messages.error(request, 'Failed to create product.')
+            
+        # Preserve supplier IDs as strings for template repopulation on error
+        old_input['supplier_ids'] = [str(sid) for sid in payload['supplier_ids']]
 
-    # Fetch dropdown data
-    cats_res = api_call('GET', '/api/categories/?page_size=50', token=token)
-    categories = cats_res.json().get('results', []) if cats_res.status_code == 200 else []
-
-    pt_res = api_call('GET', '/api/product-types/?page_size=50', token=token)
-    product_types = pt_res.json().get('results', []) if pt_res.status_code == 200 else []
-
-    supp_res = api_call('GET', '/api/suppliers/?page_size=50', token=token)
-    suppliers = supp_res.json().get('results', []) if supp_res.status_code == 200 else []
+    # FIX: Fetch ALL pages for dropdowns to prevent N-1 truncation
+    categories = fetch_all_api_data('/api/categories/', token)
+    product_types = fetch_all_api_data('/api/product-types/', token)
+    suppliers = fetch_all_api_data('/api/suppliers/', token)
 
     return render(request, 'products/product_form.html', {
         'edit_mode': False, 'errors': errors, 'product': old_input,
@@ -114,6 +111,12 @@ def product_edit(request, id):
         return redirect('template-product-list')
     product_data = response.json()
 
+    # Normalize M2M for template: Convert nested API objects to a flat list of string IDs
+    if product_data.get('suppliers') and isinstance(product_data['suppliers'], list):
+        product_data['supplier_ids'] = [str(s['id']) for s in product_data['suppliers']]
+    else:
+        product_data['supplier_ids'] = []
+
     if request.method == 'POST':
         old_input = request.POST.dict()
         old_input['is_active'] = request.POST.get('is_active') == 'on'
@@ -140,27 +143,23 @@ def product_edit(request, id):
             return redirect('template-product-list')
         elif response.status_code == 400:
             errors = response.json()
-            # Flatten IDs for template repopulation
+            # Merge and keep supplier IDs as strings for template repopulation
             product_data.update(old_input)
-            product_data['supplier_ids'] = payload['supplier_ids']
+            product_data['supplier_ids'] = [str(sid) for sid in payload['supplier_ids']]
         else:
             messages.error(request, 'Failed to update product.')
 
-    # Fetch dropdown data
-    cats_res = api_call('GET', '/api/categories/?page_size=50', token=token)
-    categories = cats_res.json().get('results', []) if cats_res.status_code == 200 else []
-
-    pt_res = api_call('GET', '/api/product-types/?page_size=50', token=token)
-    product_types = pt_res.json().get('results', []) if pt_res.status_code == 200 else []
-
-    supp_res = api_call('GET', '/api/suppliers/?page_size=50', token=token)
-    suppliers = supp_res.json().get('results', []) if supp_res.status_code == 200 else []
+    # FIX: Fetch ALL pages for dropdowns
+    categories = fetch_all_api_data('/api/categories/', token)
+    product_types = fetch_all_api_data('/api/product-types/', token)
+    suppliers = fetch_all_api_data('/api/suppliers/', token)
 
     return render(request, 'products/product_form.html', {
         'edit_mode': True, 'errors': errors, 'product': product_data,
         'categories': categories, 'product_types': product_types, 'suppliers': suppliers,
         'base_units': Product.BaseUnit.choices,
     })
+
 
 @login_required_template
 @pharmacy_staff_required
