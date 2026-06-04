@@ -71,45 +71,40 @@ def categories_list(request):
 def category_create(request):
     token = request.session.get('token')
     errors = {}
-    old_input = {} # Initialize empty
+    old_input = {}
 
     if request.method == 'POST':
-        data = {
-            'name': request.POST.get('name'),
-            'product_type_id': request.POST.get('product_type_id') or None,
-            'parent_id': request.POST.get('parent_id') or None,
-            'is_active': request.POST.get('is_active') == 'on',
+        old_input = request.POST.dict()
+        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        
+        payload = {
+            'name': old_input.get('name'),
+            'product_type_id': old_input.get('product_type_id') or None,
+            'parent_id': old_input.get('parent_id') or None,
+            'is_active': old_input['is_active'],
         }
 
-        files = None
-        if 'image' in request.FILES:
-            files = {'image': request.FILES['image']}
+        files = {'image': request.FILES['image']} if 'image' in request.FILES else None
 
-        response = api_call('POST', '/api/categories/', data=data, token=token, files=files)
+        response = api_call('POST', '/api/categories/', data=payload, token=token, files=files)
 
         if response.status_code == 201:
             messages.success(request, 'Category created successfully!')
             return redirect('template-category-list')
+        elif response.status_code == 400:
+            errors = response.json()
         else:
-            if response.status_code == 400:
-                errors = response.json()
-                old_input = request.POST # <--- KEEP THE OLD INPUT ALIVE
-            else:
-                messages.error(request, 'An unexpected error occurred.')
+            messages.error(request, 'An unexpected error occurred.')
 
-    # Fetch dropdown data
-    pt_response = api_call('GET', '/api/product-types/', token=token)
-    product_types = pt_response.json().get('results', []) if pt_response.status_code == 200 else []
-
-    cat_response = api_call('GET', '/api/categories/?page_size=50', token=token) 
-    parent_categories = cat_response.json().get('results', []) if cat_response.status_code == 200 else []
+    # FIX: Fetch ALL pages for dropdowns
+    product_types = fetch_all_api_data('/api/product-types/', token)
+    parent_categories = fetch_all_api_data('/api/categories/', token)
 
     return render(request, 'categories/category_form.html', {
-        'edit_mode': False,
-        'errors': errors,
+        'edit_mode': False, 'errors': errors,
         'product_types': product_types,
         'parent_categories': parent_categories,
-        'category': old_input or {}, # <--- PASS IT AS CATEGORY CONTEXT
+        'category': old_input or {},
     })
 
 # === Category Detail (Updated) ===
@@ -166,58 +161,45 @@ def category_edit(request, id):
     token = request.session.get('token')
     errors = {}
 
-    # 1. Fetch the existing category to pre-populate the form
     cat_response = api_call('GET', f'/api/categories/{id}/', token=token)
     if cat_response.status_code != 200:
         messages.error(request, 'Category not found')
         return redirect('template-category-list')
     category_data = cat_response.json()
 
-    # 2. Handle form submission
     if request.method == 'POST':
-        # Convert QueryDict to standard dict and handle types for our template "old()" logic
         old_input = request.POST.dict()
         old_input['is_active'] = request.POST.get('is_active') == 'on'
         
         payload = {
-            'name': request.POST.get('name'),
-            'product_type_id': request.POST.get('product_type_id') or None,
-            'parent_id': request.POST.get('parent_id') or None,
+            'name': old_input.get('name'),
+            'product_type_id': old_input.get('product_type_id') or None,
+            'parent_id': old_input.get('parent_id') or None,
             'is_active': old_input['is_active'],
         }
 
-        files = None
-        if 'image' in request.FILES:
-            files = {'image': request.FILES['image']}
+        files = {'image': request.FILES['image']} if 'image' in request.FILES else None
 
-        # 3. Use PATCH
         response = api_call('PATCH', f'/api/categories/{id}/', data=payload, token=token, files=files)
 
         if response.status_code == 200:
             messages.success(request, 'Category updated successfully!')
             return redirect('template-category-list')
+        elif response.status_code == 400:
+            errors = response.json()
+            category_data.update(old_input)
         else:
-            if response.status_code == 400:
-                errors = response.json()
-                # Merge old input over API data so the template repopulates the failed form
-                category_data.update(old_input)
-            else:
-                messages.error(request, 'Failed to update category.')
+            messages.error(request, 'Failed to update category.')
 
-    # Fetch product types and parent categories for dropdowns
-    pt_response = api_call('GET', '/api/product-types/', token=token)
-    product_types = pt_response.json().get('results', []) if pt_response.status_code == 200 else []
+    # FIX: Fetch ALL pages for dropdowns
+    product_types = fetch_all_api_data('/api/product-types/', token)
+    parent_categories = fetch_all_api_data('/api/categories/', token)
 
-    cat_response_all = api_call('GET', '/api/categories/?page_size=50', token=token) 
-    parent_categories = cat_response_all.json().get('results', []) if cat_response_all.status_code == 200 else []
-
-    # Exclude current category from parent options (a category can't be its own parent)
+    # Exclude current category from parent options
     parent_categories = [c for c in parent_categories if c.get('id') != id]
 
     return render(request, 'categories/category_form.html', {
-        'edit_mode': True,
-        'category': category_data,
-        'errors': errors,
+        'edit_mode': True, 'category': category_data, 'errors': errors,
         'product_types': product_types,
         'parent_categories': parent_categories,
     })

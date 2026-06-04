@@ -124,42 +124,43 @@
             allCategories: [],
             filteredCategories: [],
             
-            // Clean dynamic structural model parsing fallback solutions
             selectedProductType: "{% firstof category.product_type_id category.product_type.id '' %}",
-            selectedParent: "{% firstof category.parent_id category.parent.id '' %}",
+            selectedParent: "{% firstof category.parent_id category.parent '' %}",
 
             init() {
                 const dataEl = document.getElementById('parent-categories-data');
                 if (dataEl) {
                     this.allCategories = JSON.parse(dataEl.textContent);
                 }
-                
-                // Initialize clean component matching layout structures
                 this.filterCategoriesByAssignment();
             },
 
             handleProductTypeChange() {
                 this.filterCategoriesByAssignment();
-                // Flush child relationships out of bounds if structural category parent shifts
-                this.selectedParent = '';
+                this.selectedParent = ''; // Reset parent when type changes
             },
 
             filterCategoriesByAssignment() {
                 const currentId = "{{ category.id|default:'' }}";
                 
                 if (!this.selectedProductType) {
-                    // Filter down self targets cleanly on raw roots initialization
+                    // No product type selected? Show all categories (except self)
                     this.filteredCategories = this.allCategories.filter(cat => 
                         String(cat.id) !== String(currentId)
                     );
                 } else {
                     this.filteredCategories = this.allCategories.filter(cat => {
-                        // Safe Guard: A category cannot be its own parent node
-                        if (currentId && String(cat.id) === String(currentId)) {
-                            return false;
-                        }
-                        // Support both raw foreign key IDs and nested serialized object evaluation parameters
+                        // Guard: Cannot be own parent
+                        if (currentId && String(cat.id) === String(currentId)) return false;
+
+                        // FIX: Show categories that match the type OR are generic (no type assigned)
+                        // This allows root folders to be selected as parents
                         const typeId = cat.product_type_id || (cat.product_type ? cat.product_type.id : null);
+                        
+                        // If the category has no type, it's a generic folder, allow it
+                        if (!typeId) return true; 
+                        
+                        // If it has a type, it must match the selected type
                         return String(typeId) === String(this.selectedProductType);
                     });
                 }
