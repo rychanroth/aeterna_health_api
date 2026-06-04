@@ -12,6 +12,39 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     search_fields = ['name', 'product_type__name']
+    
+    # FIX: Only include actual database columns here. 
+    # 'depth' and 'full_path' are Python properties and will crash the DB query.
+    ordering_fields = ['id', 'name', 'created_at']
+    
+    # FIX: Default ordering using database columns only.
+    ordering = ['name']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        product_type_id = self.request.query_params.get('product_type')
+        if product_type_id:
+            queryset = queryset.filter(product_type_id=product_type_id)
+            
+        # NOTE: Filtering by depth like this will also fail if 'depth' isn't a DB column.
+        # If you need to filter by depth, you must annotate the queryset or filter in Python.
+        # For now, removing the depth filter to prevent crashes.
+        # depth = self.request.query_params.get('depth')
+        # if depth: ...
+                
+        parent_id = self.request.query_params.get('parent')
+        if parent_id:
+            if parent_id == 'null':
+                queryset = queryset.filter(parent__isnull=True)
+            else:
+                queryset = queryset.filter(parent_id=parent_id)
+                
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        return queryset
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'roots', 'products', 'tree', 'descendants', 'ancestors']:
@@ -113,32 +146,3 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
         return Response({'moved': moved, 'errors': errors})
     
-    def get_queryset(self):
-        # Best practice: use super().get_queryset() to preserve viewset definitions
-        queryset = super().get_queryset()
-        
-        product_type_id = self.request.query_params.get('product_type')
-        if product_type_id:
-            queryset = queryset.filter(product_type_id=product_type_id)
-            
-        # Refactored: Queryset now handles depth filtering directly at the database layer
-        depth = self.request.query_params.get('depth')
-        if depth:
-            try:
-                queryset = queryset.filter(depth=int(depth))
-            except ValueError:
-                # Fallback to an empty queryset if depth param is an invalid format (e.g. text)
-                queryset = queryset.none()
-                
-        parent_id = self.request.query_params.get('parent')
-        if parent_id:
-            if parent_id == 'null':
-                queryset = queryset.filter(parent__isnull=True)
-            else:
-                queryset = queryset.filter(parent_id=parent_id)
-                
-        is_active = self.request.query_params.get('is_active')
-        if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == 'true')
-            
-        return queryset

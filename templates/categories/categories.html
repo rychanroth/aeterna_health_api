@@ -29,16 +29,14 @@
         <input type="text" name="search" value="{{ search_query }}" placeholder="Search by name..."
             class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
     </div>
-    <!-- Ordering Dropdown -->
+    <!-- Inside the Search & Filter Bar form -->
     <div class="w-64">
         <label class="block text-xs text-gray-600 mb-1">Order By</label>
         <select name="ordering"
             class="w-full border border-gray-300 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
-            <option value="">Default</option>
+            <option value="">Default (Name A-Z)</option>
             <option value="name" {% if ordering == 'name' %}selected{% endif %}>Name (A-Z)</option>
             <option value="-name" {% if ordering == '-name' %}selected{% endif %}>Name (Z-A)</option>
-            <option value="depth" {% if ordering == 'depth' %}selected{% endif %}>Depth (Asc)</option>
-            <option value="-depth" {% if ordering == '-depth' %}selected{% endif %}>Depth (Desc)</option>
             <option value="-created_at" {% if ordering == '-created_at' %}selected{% endif %}>Newest First</option>
             <option value="created_at" {% if ordering == 'created_at' %}selected{% endif %}>Oldest First</option>
         </select>

@@ -12,6 +12,7 @@ from rest_framework.decorators import action
 from rest_framework import status
 from django.db import transaction
 from django.core.exceptions import ValidationError
+import datetime
 
 class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
@@ -31,12 +32,23 @@ class SaleViewSet(viewsets.ModelViewSet):
         queryset = Sale.objects.all()
         if self.request.user.role == 'cashier':
             queryset = queryset.filter(cashier=self.request.user)
+            
+        # FIX: Robust date filtering
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         if start_date:
-            queryset = queryset.filter(created_at__gte=start_date)
+            try:
+                start_dt = timezone.make_aware(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                queryset = queryset.filter(created_at__gte=start_dt)
+            except ValueError:
+                pass
         if end_date:
-            queryset = queryset.filter(created_at__lte=end_date)
+            try:
+                end_dt = timezone.make_aware(datetime.datetime.strptime(end_date, '%Y-%m-%d') + datetime.timedelta(days=1))
+                queryset = queryset.filter(created_at__lt=end_dt)
+            except ValueError:
+                pass
+                
         cashier_id = self.request.query_params.get('cashier')
         if cashier_id:
             queryset = queryset.filter(cashier_id=cashier_id)
