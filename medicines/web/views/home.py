@@ -11,7 +11,7 @@ def home(request):
     context = {'role': role, 'username': username}
 
     if role == 'cashier':
-        return render(request, 'cashier_placeholder.html', context)
+        return render(request, 'pos/pos.html', context)
 
     # FAST: Single API call for all KPIs
     response = api_call('GET', '/api/reports/dashboard_summary/', token=token)
