@@ -52,7 +52,7 @@ urlpatterns = [
     # STOCK MOVEMENT
     path('stock-movements/', stock_movement_list, name='template-stock-movement-list'),
     path('stock-movements/summary/', stock_movement_summary, name='template-stock-movement-summary'),
-    # path('stock-movements/create/', stoc    k_movement_create, name='template-stock-movement-create'),
+    path('stock-movements/create/', stock_movement_create, name='template-stock-movement-create'),
     path('stock-movements/<int:id>/', stock_movement_detail, name='template-stock-movement-detail'),
 
     # PRODUCT
