@@ -1,4 +1,3 @@
-# medicines/web/views/product.py
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from urllib.parse import urlencode
@@ -54,8 +53,8 @@ def product_create(request):
             'description': old_input.get('description'),
             'base_unit': old_input.get('base_unit'),
             'selling_price': old_input.get('selling_price'),
-            'stock_quantity': old_input.get('stock_quantity'),
-            'expiration_date': old_input.get('expiration_date') or None,
+            # FIX: Removed 'stock_quantity' and 'expiration_date'. 
+            # These are now handled via the Batch/Receive Stock workflow.
             'category_id': old_input.get('category_id') or None,
             'product_type_id': old_input.get('product_type_id') or None,
             'requires_prescription': old_input['requires_prescription'],
@@ -67,17 +66,16 @@ def product_create(request):
 
         response = api_call('POST', '/api/products/', data=payload, token=token, files=files)
         if response.status_code == 201:
-            messages.success(request, 'Product created successfully.')
+            messages.success(request, 'Product created successfully. You can now add stock via Receive Stock.')
             return redirect('template-product-list')
         elif response.status_code == 400:
             errors = response.json()
         else:
             messages.error(request, 'Failed to create product.')
-            
+
         # Preserve supplier IDs as strings for template repopulation on error
         old_input['supplier_ids'] = [str(sid) for sid in payload['supplier_ids']]
 
-    # FIX: Fetch ALL pages for dropdowns to prevent N-1 truncation
     categories = fetch_all_api_data('/api/categories/', token)
     product_types = fetch_all_api_data('/api/product-types/', token)
     suppliers = fetch_all_api_data('/api/suppliers/', token)
@@ -95,9 +93,17 @@ def product_detail(request, id):
     if response.status_code != 200:
         messages.error(request, 'Product not found.')
         return redirect('template-product-list')
-    
+
     product = response.json()
-    return render(request, 'products/product_detail.html', {'product': product})
+    
+    # FIX: Fetch associated active batches for this product to display on detail page
+    batches_response = api_call('GET', f'/api/batches/?product={id}&is_active=true', token=token)
+    batches = batches_response.json().get('results', []) if batches_response.status_code == 200 else []
+
+    return render(request, 'products/product_detail.html', {
+        'product': product,
+        'batches': batches  # Pass batches to the template
+    })
 
 @login_required_template
 @pharmacy_staff_required
@@ -127,7 +133,7 @@ def product_edit(request, id):
             'description': old_input.get('description'),
             'base_unit': old_input.get('base_unit'),
             'selling_price': old_input.get('selling_price'),
-            'expiration_date': old_input.get('expiration_date') or None,
+            # FIX: Removed 'expiration_date'. Handled by Batch now.
             'category_id': old_input.get('category_id') or None,
             'product_type_id': old_input.get('product_type_id') or None,
             'requires_prescription': old_input['requires_prescription'],
@@ -143,13 +149,11 @@ def product_edit(request, id):
             return redirect('template-product-list')
         elif response.status_code == 400:
             errors = response.json()
-            # Merge and keep supplier IDs as strings for template repopulation
             product_data.update(old_input)
             product_data['supplier_ids'] = [str(sid) for sid in payload['supplier_ids']]
         else:
             messages.error(request, 'Failed to update product.')
 
-    # FIX: Fetch ALL pages for dropdowns
     categories = fetch_all_api_data('/api/categories/', token)
     product_types = fetch_all_api_data('/api/product-types/', token)
     suppliers = fetch_all_api_data('/api/suppliers/', token)
