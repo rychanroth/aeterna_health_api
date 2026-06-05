@@ -148,14 +148,13 @@ def prescription_create(request):
 @pharmacy_staff_required
 def prescription_dispense(request, id):
     token = request.session.get('token')
-    errors = {}
 
     # 1. Fetch the specific prescription
     rx_response = api_call('GET', f'/api/prescriptions/{id}/', token=token)
     if rx_response.status_code != 200:
         messages.error(request, 'Prescription not found.')
         return redirect('template-prescription-list')
-    
+
     prescription = _parse_prescription_dates([rx_response.json()])[0]
 
     # Ensure it's verified before allowing dispense
@@ -166,87 +165,59 @@ def prescription_dispense(request, id):
     if request.method == 'POST':
         payment_method = request.POST.get('payment_method', 'cash')
         
-        product_ids = request.POST.getlist('product_id[]')
-        quantities = request.POST.getlist('quantity[]')
-        unit_prices = request.POST.getlist('unit_price[]')
-
-        sale_items = []
-        for i in range(len(product_ids)):
-            sale_items.append({
-                'product_id': int(product_ids[i]),
-                'quantity': int(quantities[i]),
-                'unit_price': unit_prices[i]
-            })
-
+        # 2. SIMPLE: Call the new atomic dispense endpoint!
         payload = {
-            'prescription_id': prescription['id'],
-            'payment_method': payment_method,
-            'items': sale_items,
-            'notes': f"Dispensed from Prescription #{prescription['prescription_number']}"
+            'payment_method': payment_method
         }
+        response = api_call('POST', f'/api/prescriptions/{id}/dispense/', data=payload, token=token)
 
-        # 3. Create the Sale via API
-        response = api_call('POST', '/api/sales/', data=payload, token=token)
-        if response.status_code == 201:
-            sale_id = response.json().get('id')
+        if response.status_code == 200:
             messages.success(request, f"Prescription {prescription['prescription_number']} dispensed successfully!")
-            return redirect('template-sale-detail', id=sale_id)
+            # Optional: redirect to the sale detail if we have the ID, otherwise list
+            return redirect('template-prescription-list')
         else:
-            # FIX: Safely parse and extract specific validation errors from API
+            # Handle API errors safely
             try:
                 errors = response.json()
-                error_messages = []
-                if isinstance(errors, dict):
-                    for field, msgs in errors.items():
-                        # Handle lists of errors (e.g., {'quantity': ['Insufficient stock...']})
-                        if isinstance(msgs, list):
-                            error_messages.append(f"{msgs[0]}")
-                        else:
-                            error_messages.append(f"{msgs}")
-                    error_msg = " | ".join(error_messages)
-                else:
-                    error_msg = "Validation failed."
-                messages.error(request, error_msg)
-            except (ValueError, TypeError, KeyError):
-                messages.error(request, 'Failed to dispense prescription. Check stock availability.')
+                error_msg = errors.get('error', 'Failed to dispense prescription. Check stock availability.')
+                if isinstance(error_msg, list):
+                    error_msg = " ".join(error_msg)
+            except (ValueError, TypeError):
+                error_msg = 'Failed to dispense prescription. Check stock availability.'
+            
+            messages.error(request, error_msg)
 
-    # GET Request or Form Fallback: Enrich prescription items with current product prices
+    # GET Request: Enrich prescription items with current product prices for display only
     total_amount = 0
     enriched_items = []
-    
+
     for item in prescription.get('items', []):
-        prod_id = item.get('product') # Now this will actually return the ID (e.g., 5)
+        prod_id = item.get('product')
         qty = item.get('quantity_prescribed', 0)
         price = 0.0
-        
+
         if prod_id:
-            # Fetch the specific product to get the live selling_price
             prod_res = api_call('GET', f'/api/products/{prod_id}/', token=token)
             if prod_res.status_code == 200:
                 prod_data = prod_res.json()
-                # Your model uses DecimalField, which DRF coerces to string
                 price_str = prod_data.get('selling_price', '0') or '0'
                 try:
                     price = float(price_str)
                 except (ValueError, TypeError):
                     price = 0.0
-            else:
-                messages.warning(request, f"Failed to fetch price for product ID {prod_id}")
-        
+
         subtotal = qty * price
         total_amount += subtotal
-        
+
         enriched_items.append({
-            **item, 
+            **item,
             'unit_price': price,
             'subtotal': subtotal
         })
-        
-    # Overwrite the items with our enriched data
+
     prescription['items'] = enriched_items
     prescription['calculated_total'] = total_amount
 
     return render(request, 'prescriptions/prescription_dispense.html', {
         'prescription': prescription,
-        'errors': errors,
     })
