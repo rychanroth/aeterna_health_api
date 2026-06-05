@@ -19,32 +19,23 @@ def prescription_list(request):
     search_query = request.GET.get('search', '')
     status_filter = request.GET.get('status', '')
 
+    # FIX: Rely on django-filter to handle the status param on the main endpoint.
+    # This guarantees a paginated response, eliminating the need for messy parsing logic.
     api_params = {k: v for k, v in {
         'page': current_page, 'search': search_query, 'status': status_filter
     }.items() if v}
 
-    # Determine if we hit a custom action endpoint or the main list
-    if status_filter == 'pending':
-        api_url = f'/api/prescriptions/pending/?{urlencode(api_params)}'
-    elif status_filter == 'verified':
-        api_url = f'/api/prescriptions/verified/?{urlencode(api_params)}'
-    else:
-        api_url = f'/api/prescriptions/?{urlencode(api_params)}'
-
+    api_url = f'/api/prescriptions/?{urlencode(api_params)}'
     response = api_call('GET', api_url, token=token)
-    
+
     prescriptions, next_page, prev_page, count = [], None, None, 0
     if response.status_code == 200:
         data = response.json()
-        # Custom actions return flat lists, main endpoint returns paginated dict
-        if isinstance(data, list):
-            prescriptions = _parse_prescription_dates(data)
-            count = len(prescriptions)
-        else:
-            prescriptions = _parse_prescription_dates(data.get('results', []))
-            count = data.get('count', 0)
-            if data.get('next'): next_page = data['next'].split('page=')[-1]
-            if data.get('previous'): prev_page = 1 if 'page=' not in data['previous'] else data['previous'].split('page=')[-1]
+        # Parsing is now consistently paginated
+        prescriptions = _parse_prescription_dates(data.get('results', []))
+        count = data.get('count', 0)
+        if data.get('next'): next_page = data['next'].split('page=')[-1]
+        if data.get('previous'): prev_page = 1 if 'page=' not in data['previous'] else data['previous'].split('page=')[-1]
     else:
         messages.error(request, 'Failed to load prescriptions.')
 
