@@ -46,9 +46,20 @@ class Sale(CoreAbstractModel):
         raise ValidationError("Sales cannot be deleted as they are immutable audit records.")
 
 
-class SaleItem(CoreAbstractModel):
+from django.db import models, transaction
+from django.core.exceptions import ValidationError
+from decimal import Decimal
+from .abstracts import UpdatableAbstractModel
+
+class SaleItem(UpdatableAbstractModel):
     sale = models.ForeignKey('Sale', on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, related_name='sale_items')
+    
+    # CHANGE: Link to Batch for traceability
+    batch = models.ForeignKey('Batch', on_delete=models.RESTRICT, related_name='sale_items')
+    
+    # Keep product for denormalization/easy access if batch is deactivated
+    product = models.ForeignKey('Product', on_delete=models.RESTRICT, null=True, related_name='sale_items')
+    
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -58,35 +69,33 @@ class SaleItem(CoreAbstractModel):
 
     def clean(self):
         super().clean()
-        if self.product and self.quantity is not None:
-            if self.product.stock_quantity < self.quantity:
+        # Validate against BATCH stock, not Product stock
+        if self.batch and self.quantity is not None:
+            if self.batch.quantity < self.quantity:
                 raise ValidationError({
-                    'quantity': f'Insufficient stock. Available: {self.product.stock_quantity} {self.product.base_unit}(s)'
+                    'quantity': f'Insufficient stock in Batch {self.batch.batch_number}. Available: {self.batch.quantity}'
                 })
 
     def save(self, *args, **kwargs):
-        # CONSTRAINT ENFORCEMENT: Cannot update a sale item audit trail
         if self.pk is not None:
-            raise ValidationError("Sale items cannot be updated. Please void the sale and create a new one if correction is needed.")
+            raise ValidationError("SaleItem cannot be updated.")
 
         self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
+        
+        # Denormalize product link for reporting
+        if not self.product_id and self.batch_id:
+            self.product = self.batch.product
 
         with transaction.atomic():
             super().save(*args, **kwargs)
 
-            if self.product:
-                from .stock_movement import StockMovement # Prevent circular import
+            if self.batch:
+                StockMovement = self._meta.get_field('batch').related_model._meta.get_field('stock_movements').related_model # Hacky way to avoid circular import, see below
+                # Better way:
+                from .stock_movement import StockMovement
                 
-                # Re-fetch product inside transaction to lock it and ensure stock hasn't changed
-                self.product.refresh_from_db()
-                if self.product.stock_quantity < self.quantity:
-                    raise ValidationError({
-                        'quantity': f'Insufficient stock for {self.product.name}'
-                    })
-
-                # Automatically create the immutable Stock Movement ledger entry
                 StockMovement.objects.create(
-                    product=self.product,
+                    batch=self.batch,
                     movement_type=StockMovement.Reason.SALE,
                     quantity=self.quantity,
                     sale=self.sale,
@@ -95,14 +104,8 @@ class SaleItem(CoreAbstractModel):
                     created_by=self.sale.cashier
                 )
 
-            # Recalculate and update the parent Sale total
             self.sale.total_amount = self.sale.calculate_total()
-            # Bypass the Sale.save() update constraint for internal calculation updates
             Sale.objects.filter(pk=self.sale.pk).update(total_amount=self.sale.total_amount)
 
     def delete(self, *args, **kwargs):
-        # CONSTRAINT ENFORCEMENT: Cannot delete a sale item audit trail
-        raise ValidationError("Sale items cannot be deleted as they are immutable audit records.")
-
-    def __str__(self):
-        return f"{self.sale.sale_number} - {self.product}"
+        raise ValidationError("Sale items cannot be deleted.")

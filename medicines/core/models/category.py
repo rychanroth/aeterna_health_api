@@ -14,7 +14,7 @@ class Category(UpdatableAbstractModel):
     )
     product_type = models.ForeignKey(
         'ProductType',
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         related_name='categories',
         verbose_name='product type'
     )
