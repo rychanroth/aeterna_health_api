@@ -107,3 +107,54 @@ class PatientFilter(django_filters.FilterSet):
             # Exclude null/empty allergy notes
             return queryset.exclude(Q(allergy_notes__isnull=True) | Q(allergy_notes=''))
         return queryset
+    
+class PrescriptionFilter(django_filters.FilterSet):
+    # Filtering by prescription_date instead of created_at
+    start_date = django_filters.DateFilter(field_name='prescription_date', lookup_expr='gte')
+    end_date = django_filters.DateFilter(field_name='prescription_date', lookup_expr='lte')
+
+    class Meta:
+        model = Prescription
+        fields = {
+            'status': ['exact'],
+            'patient': ['exact'],
+            'doctor': ['exact'],
+        }
+    
+class SaleFilter(django_filters.FilterSet):
+    start_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__gte')
+    end_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__lte')
+
+    class Meta:
+        model = Sale
+        fields = {
+            'cashier': ['exact'],
+            'prescription': ['exact'],
+            'payment_method': ['exact'],
+        }
+
+
+class StockMovementFilter(django_filters.FilterSet):
+    # Map the 'product' query param to the 'batch__product' DB field
+    product = django_filters.NumberFilter(field_name='batch__product')
+    direction = django_filters.CharFilter(method='filter_direction', label='Direction (in/out)')
+    start_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__gte')
+    end_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__lte')
+
+    class Meta:
+        model = StockMovement
+        fields = {
+            'batch': ['exact'],
+            'movement_type': ['exact'],
+            'supplier': ['exact'],
+            'sale': ['exact'],
+        }
+
+    def filter_direction(self, queryset, name, value):
+        if value == 'in':
+            in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+            return queryset.filter(movement_type__in=in_reasons)
+        elif value == 'out':
+            out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+            return queryset.filter(movement_type__in=out_reasons)
+        return queryset
