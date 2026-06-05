@@ -23,17 +23,48 @@ class SaleItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'subtotal', 'product_name', 'batch_number'] # product_name derived in create
 
+    def get_cashier_name(self, obj):
+        if obj.cashier:
+            return obj.cashier.get_full_name() or obj.cashier.username
+        return None
+
     def validate(self, data):
         data = super().validate(data)
-        batch = data.get('batch')
-        quantity = data.get('quantity', 0)
-        
-        # Validation: Check if the batch has enough stock
-        if batch and quantity > 0:
-            if batch.quantity < quantity:
+        items_data = data.get('items', [])
+        prescription = data.get('prescription')
+
+        requires_prescription = False
+        rx_sale_products = set()
+
+        # FIX: Resolve the product from the batch to check prescription requirements
+        for item_data in items_data:
+            batch = item_data.get('batch')
+            if batch:
+                product = batch.product
+                if product and product.effective_requires_prescription:
+                    requires_prescription = True
+                    rx_sale_products.add(product.id)
+
+        if requires_prescription and not prescription:
+            raise serializers.ValidationError(
+                "One or more products require a prescription. Please provide a prescription."
+            )
+
+        if prescription:
+            if prescription.status != Prescription.Status.VERIFIED:
                 raise serializers.ValidationError(
-                    f"Insufficient stock in Batch {batch.batch_number}. Available: {batch.quantity}"
+                    f"Prescription must be verified before sale. Current status: {prescription.status}"
                 )
+
+            prescription_products = set(
+                item.product_id for item in prescription.items.all() if item.product_id
+            )
+
+            if not rx_sale_products.issubset(prescription_products):
+                raise serializers.ValidationError(
+                    "Some products requiring a prescription are not in the provided prescription."
+                )
+
         return data
 
     def create(self, validated_data):

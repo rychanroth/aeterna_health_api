@@ -49,19 +49,20 @@ class StockMovementSerializer(serializers.ModelSerializer):
     def validate(self, data):
         data = super().validate(data)
 
-        product = data.get('product') or (self.instance.product if self.instance else None)
+        # FIX: Target the Batch, not the Product
+        batch = data.get('batch')
         movement_type = data.get('movement_type')
         quantity = data.get('quantity', 0)
-        
+
         if movement_type and quantity:
             out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
-            
+
             if movement_type in out_reasons:
-                if product and product.stock_quantity < quantity:
+                if batch and batch.quantity < quantity:
                     raise serializers.ValidationError(
-                        f"Insufficient stock. Available: {product.stock_quantity} {product.base_unit} (s)"
+                        f"Insufficient stock in Batch {batch.batch_number}. Available: {batch.quantity}"
                     )
-        
+
         return data
 
     def create(self, validated_data):

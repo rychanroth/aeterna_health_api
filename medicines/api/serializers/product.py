@@ -40,15 +40,9 @@ class ProductSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("Price must be greater than 0.")
         return value
-    
+
     def validate(self, data):
         data = super().validate(data)
-        product_type = data.get('product_type') or (self.instance.product_type if self.instance else None)
-        expiration_date = data.get('expiration_date')
-
-        if product_type and product_type.requires_expiration:
-            if not expiration_date:
-                raise serializers.ValidationError({
-                    'expiration_date': f'Expiration date is required for {product_type.name} products'
-                })
+        # FIX: Removed the expiration_date validation. 
+        # Expiration is now validated at the Batch level, not Product.
         return data
