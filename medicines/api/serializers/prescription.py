@@ -1,27 +1,34 @@
 from rest_framework import serializers
 from django.db import transaction
-from medicines.core.models import Prescription, PrescriptionItem, Product, Doctor, Patient
+from medicines.core.models import Prescription, PrescriptionItem, Product, Doctor, Patient, Batch
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
+    batch_number = serializers.ReadOnlyField(source='batch.batch_number')
     
-    # For reading the ID in GET responses
-    product = serializers.PrimaryKeyRelatedField(read_only=True) 
-    
-    # For writing the ID in POST/PATCH requests
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(),
         source='product',
         write_only=True
     )
+    
+    # NEW: Batch assignment (for dispensing)
+    batch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Batch.objects.all(),
+        source='batch',
+        write_only=True,
+        allow_null=True,
+        required=False # Not required when just writing the Rx
+    )
 
     class Meta:
         model = PrescriptionItem
         fields = [
-            'id', 'product_name', 'product_id', 'product',
+            'id', 'product_name', 'product_id',
+            'batch_number', 'batch_id',
             'quantity_prescribed', 'dosage_instructions', 'is_dispensed'
         ]
-        read_only_fields = ['id', 'is_dispensed', 'product']
+        read_only_fields = ['id', 'is_dispensed', 'product_name', 'batch_number']
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     items = PrescriptionItemSerializer(many=True)

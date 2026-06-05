@@ -40,14 +40,12 @@ class Product(UpdatableAbstractModel):
 
     name = models.CharField(max_length=200)
     image = models.ImageField(upload_to='products/', blank=True, null=True)
-    product_type = models.ForeignKey('ProductType', on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    product_type = models.ForeignKey('ProductType', on_delete=models.RESTRICT, null=True, blank=True, related_name='products')
     base_unit = models.CharField(max_length=20, choices=BaseUnit.choices, default=BaseUnit.TABLET)
-    category = models.ForeignKey('Category', on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    category = models.ForeignKey('Category', on_delete=models.RESTRICT, null=True, blank=True, related_name='products')
     suppliers = models.ManyToManyField('Supplier', blank=True, related_name='products')
     description = models.TextField(blank=True)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
-    stock_quantity = models.IntegerField(default=0)
-    expiration_date = models.DateField(null=True, blank=True)
     requires_prescription = models.BooleanField(default=False)
 
     class Meta:
@@ -57,15 +55,30 @@ class Product(UpdatableAbstractModel):
     def __str__(self):
         return self.name
 
+    # --- COMPUTED PROPERTIES (Aggregated from Batches) ---
+
+    @property
+    def total_stock(self):
+        """Sum of all active batches."""
+        return sum(b.quantity for b in self.batches.filter(is_active=True))
+
+    @property
+    def nearest_expiration(self):
+        """Find the soonest expiration date among active batches."""
+        active_batches = self.batches.filter(is_active=True, expiration_date__isnull=False).order_by('expiration_date')
+        return active_batches.first().expiration_date if active_batches.exists() else None
+
     @property
     def is_expired(self):
-        if self.expiration_date:
-            return self.expiration_date < timezone.now().date()
-        return False
+        """Check if ALL active batches are expired."""
+        active_batches = self.batches.filter(is_active=True, expiration_date__isnull=False)
+        if not active_batches.exists():
+            return False
+        return all(b.is_expired for b in active_batches)
 
     @property
     def is_low_stock(self):
-        return self.stock_quantity < 10
+        return self.total_stock < 10
 
     @property
     def effective_requires_prescription(self):
@@ -75,15 +88,9 @@ class Product(UpdatableAbstractModel):
 
     def clean(self):
         super().clean()
-        if self.product_type:
-            if self.product_type.requires_expiration and not self.expiration_date:
-                raise ValidationError({
-                    'expiration_date': f'Expiration date is required for {self.product_type.name} products.'
-                })
-        if self.stock_quantity < 0:
-            raise ValidationError({
-                'stock_quantity': 'Stock quantity cannot be negative.'
-            })
+        # Removed stock_quantity and expiration validation from here
+        if self.product_type and self.product_type.requires_expiration and self.requires_prescription and not self.requires_prescription:
+            pass # Logic can be refined if needed
 
     def save(self, *args, **kwargs):
         self.clean()

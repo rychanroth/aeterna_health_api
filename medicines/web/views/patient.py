@@ -18,14 +18,13 @@ def patient_list(request):
         'page': current_page, 'search': search_query, 'ordering': ordering
     }.items() if v}
 
-    # Determine which endpoint to hit
+    # FIX: Use the django-filter parameter instead of the deleted custom action endpoint
     if allergy_filter == 'true':
-        api_url = f'/api/patients/with_allergies/?{urlencode(api_params)}'
-    else:
-        api_url = f'/api/patients/?{urlencode(api_params)}'
+        api_params['with_allergies'] = 'true'
 
+    api_url = f'/api/patients/?{urlencode(api_params)}'
     response = api_call('GET', api_url, token=token)
-    
+
     patients, next_page, prev_page, count = [], None, None, 0
     if response.status_code == 200:
         data = response.json()
@@ -37,8 +36,8 @@ def patient_list(request):
         messages.error(request, 'Failed to load patients.')
 
     return render(request, 'patients/patient_list.html', {
-        'patients': patients, 'next_page': next_page, 'prev_page': prev_page, 
-        'count': count, 'current_page': current_page, 'search_query': search_query, 
+        'patients': patients, 'next_page': next_page, 'prev_page': prev_page,
+        'count': count, 'current_page': current_page, 'search_query': search_query,
         'ordering': ordering, 'allergy_filter': allergy_filter
     })
 

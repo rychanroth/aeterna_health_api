@@ -20,8 +20,8 @@ class Prescription(UpdatableAbstractModel):
         REJECTED = 'rejected', 'Rejected'
 
     prescription_number = models.CharField(max_length=30, unique=True, default=generate_rx_number)
-    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, null=True, blank=True, related_name='prescriptions')
-    patient = models.ForeignKey('Patient', on_delete=models.CASCADE, null=True, blank=True, related_name='prescriptions')
+    doctor = models.ForeignKey('Doctor', on_delete=models.RESTRICT, null=True, blank=True, related_name='prescriptions')
+    patient = models.ForeignKey('Patient', on_delete=models.RESTRICT, null=True, blank=True, related_name='prescriptions')
     prescription_date = models.DateField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     verified_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_prescriptions')
@@ -45,7 +45,11 @@ class Prescription(UpdatableAbstractModel):
 
 class PrescriptionItem(UpdatableAbstractModel):
     prescription = models.ForeignKey('Prescription', on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, related_name='prescription_items')
+    product = models.ForeignKey('Product', on_delete=models.RESTRICT, null=True, related_name='prescription_items')
+    
+    # NEW: Assign batch upon dispensing
+    batch = models.ForeignKey('Batch', on_delete=models.RESTRICT, null=True, blank=True, related_name='prescription_items')
+    
     quantity_prescribed = models.PositiveIntegerField()
     dosage_instructions = models.CharField(max_length=200, blank=True)
     is_dispensed = models.BooleanField(default=False)

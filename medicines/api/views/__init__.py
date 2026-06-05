@@ -10,3 +10,4 @@ from .patient import PatientViewSet
 from .prescription import PrescriptionViewSet
 from .stock_movement import StockMovementViewSet
 from .report import ReportViewSet
+from .batch import BatchViewSet

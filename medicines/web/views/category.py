@@ -9,52 +9,45 @@ from medicines.web.decorators import *
 @pharmacy_staff_required
 def categories_list(request):
     token = request.session.get('token')
-    
-    # 1. Capture all possible query parameters from the user's request
+
     current_page = request.GET.get('page', 1)
     search_query = request.GET.get('search', '')
-    ordering = request.GET.get('ordering', '') # e.g., 'name', '-created_at', 'depth'
-    depth = request.GET.get('depth', '')       # <-- FIX: Capture depth from frontend query parameters
-    
-    # 2. Build the API parameters dictionary
-    api_params = {
+    ordering = request.GET.get('ordering', '')
+    # FIX: Replaced unsupported 'depth' filter with DB-supported 'parent__isnull'
+    # e.g., ?parent__isnull=true fetches root categories (depth 0)
+    parent_isnull = request.GET.get('parent__isnull', '') 
+
+    api_params = {k: v for k, v in {
         'page': current_page,
         'search': search_query,
         'ordering': ordering,
-        'depth': depth,  
-    }
-    
-    # Remove keys with empty values so we don't send ?search=&ordering=&depth= to the API
-    api_params = {k: v for k, v in api_params.items() if v}
-    
-    # 3. Construct the clean API URL
+        'parent__isnull': parent_isnull,
+    }.items() if v}
+
     api_url = f'/api/categories/?{urlencode(api_params)}'
     response = api_call('GET', api_url, token=token)
-    
-    # 4. Setup default values
+
     categories = []
     next_page = None
     prev_page = None
     count = 0
-    
+
     if response.status_code == 200:
         data = response.json()
         categories = data.get('results', [])
         count = data.get('count', 0)
-        
+
         if data.get('next'):
             next_page = data['next'].split('page=')[-1]
-            
+
         if data.get('previous'):
             if 'page=' in data['previous']:
                 prev_page = data['previous'].split('page=')[-1]
             else:
                 prev_page = 1
-                
     else:
         messages.error(request, 'Failed to load categories')
-    
-    # 5. Pass variables to the template, including the depth filter
+
     return render(request, 'categories/categories.html', {
         'categories': categories,
         'next_page': next_page,
@@ -63,7 +56,7 @@ def categories_list(request):
         'current_page': current_page,
         'search_query': search_query,
         'ordering': ordering,
-        'depth': depth,       
+        'parent_isnull': parent_isnull, # Updated context variable
     })
     
 @login_required_template

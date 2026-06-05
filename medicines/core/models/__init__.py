@@ -9,3 +9,4 @@ from .doctor import Doctor
 from .patient import Patient
 from .prescription import Prescription, PrescriptionItem
 from .stock_movement import StockMovement
+from .batch import Batch
