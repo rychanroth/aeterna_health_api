@@ -99,12 +99,18 @@ class Category(UpdatableAbstractModel):
         return Product.objects.filter(category_id__in=category_ids)
 
     def get_total_stock(self):
-        return self.get_all_products().aggregate(
-            total=models.Sum('stock_quantity')
-        )['total'] or 0
+        from .batch import Batch # Local import to avoid circularity
+        return Batch.objects.filter(
+            product__in=self.get_all_products(), 
+            is_active=True
+        ).aggregate(total=models.Sum('quantity'))['total'] or 0
 
     def get_total_value(self):
         from django.db.models import F
-        return self.get_all_products().aggregate(
-            total=models.Sum(models.F('stock_quantity') * models.F('selling_price'))
+        from .batch import Batch # Local import to avoid circularity
+        return Batch.objects.filter(
+            product__in=self.get_all_products(), 
+            is_active=True
+        ).aggregate(
+            total=models.Sum(models.F('quantity') * models.F('product__selling_price'))
         )['total'] or 0

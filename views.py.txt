@@ -1,0 +1,985 @@
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny
+from rest_framework import status, serializers
+from django.contrib.auth import authenticate
+from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiResponse
+
+@extend_schema(
+    tags=['Auth'],
+    request=inline_serializer(
+        name='LoginRequest',
+        fields={
+            'username': serializers.CharField(),
+            'password': serializers.CharField(),
+        }
+    ),
+    responses={
+        200: inline_serializer(
+            name='LoginResponse',
+            fields={
+                'token': serializers.CharField(),
+                'user_id': serializers.IntegerField(),
+                'username': serializers.CharField(),
+            }
+        ),
+        401: OpenApiResponse(description='Invalid Credentials')
+    },
+    auth=None
+)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def login(request):
+    """Exchage username/password for auth token"""
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    user = authenticate(username=username, password=password)
+
+    if user:
+        token, created = Token.objects.get_or_create(user=user)
+        return Response({
+            'token': token.key,
+            'user_id': user.id,
+            'username': user.username
+        })
+    return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend, FilterSet, BooleanFilter
+from django.utils import timezone
+from medicines.core.models import Batch
+from medicines.api.serializers import BatchSerializer
+from medicines.api.permissions import IsAdmin, IsPharmacist
+from rest_framework.permissions import IsAuthenticated
+
+class BatchFilter(FilterSet):
+    is_expired = BooleanFilter(method='filter_is_expired', label='Is Expired')
+
+    class Meta:
+        model = Batch
+        fields = ['product', 'supplier', 'is_active']
+
+    def filter_is_expired(self, queryset, name, value):
+        today = timezone.now().date()
+        if value:
+            return queryset.filter(expiration_date__lt=today)
+        return queryset.filter(expiration_date__gte=today)
+
+class BatchViewSet(viewsets.ModelViewSet):
+    queryset = Batch.objects.select_related('product', 'supplier').all()
+    serializer_class = BatchSerializer
+    
+    # Search & Filter Configuration
+    search_fields = ['batch_number', 'product__name', 'supplier__name']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = BatchFilter
+    ordering_fields = ['expiration_date', 'quantity', 'received_date', 'created_at']
+    ordering = ['expiration_date'] # Default FEFO ordering
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdmin | IsPharmacist]
+        return [permission() for permission in permission_classes]from rest_framework import viewsets, serializers
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
+from medicines.core.models import Category, Product
+from medicines.api.serializers import CategorySerializer, ProductSerializer
+from medicines.api.permissions import IsAdmin
+from drf_spectacular.utils import extend_schema, inline_serializer
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    search_fields = ['name', 'product_type__name']
+    
+    # FIX: Only include actual database columns here. 
+    # 'depth' and 'full_path' are Python properties and will crash the DB query.
+    ordering_fields = ['id', 'name', 'created_at']
+    
+    # FIX: Default ordering using database columns only.
+    ordering = ['name']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        product_type_id = self.request.query_params.get('product_type')
+        if product_type_id:
+            queryset = queryset.filter(product_type_id=product_type_id)
+            
+        # NOTE: Filtering by depth like this will also fail if 'depth' isn't a DB column.
+        # If you need to filter by depth, you must annotate the queryset or filter in Python.
+        # For now, removing the depth filter to prevent crashes.
+        # depth = self.request.query_params.get('depth')
+        # if depth: ...
+                
+        parent_id = self.request.query_params.get('parent')
+        if parent_id:
+            if parent_id == 'null':
+                queryset = queryset.filter(parent__isnull=True)
+            else:
+                queryset = queryset.filter(parent_id=parent_id)
+                
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        return queryset
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve', 'roots', 'products', 'tree', 'descendants', 'ancestors']:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdmin]
+        return [permission() for permission in permission_classes]
+
+    @action(detail=False, methods=['get'])
+    def roots(self, request):
+        queryset = self.get_queryset().filter(parent__isnull=True)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def tree(self, request):
+        product_type_id = request.query_params.get('product_type')
+        if not product_type_id:
+            return Response({'error': 'product_type parameter is required'}, status=400)
+        roots = Category.objects.filter(product_type_id=product_type_id, parent__isnull=True, is_active=True)
+        serializer = self.get_serializer(roots, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def descendants(self, request, pk=None):
+        category = self.get_object()
+        descendants = category.get_descendants()
+        serializer = self.get_serializer(descendants, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def ancestors(self, request, pk=None):
+        category = self.get_object()
+        ancestors = category.get_ancestors()
+        serializer = self.get_serializer(ancestors, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def products(self, request, pk=None):
+        category = self.get_object()
+        products = category.get_all_products().filter(is_active=True)
+        page = self.paginate_queryset(products)
+        if page is not None:
+            serializer = ProductSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = ProductSerializer(products, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        responses={200: inline_serializer(name='CategoryStockSummary', fields={'category': serializers.CharField(), 'full_path': serializers.CharField(), 'total_products': serializers.IntegerField(), 'total_stock': serializers.IntegerField(), 'total_value': serializers.FloatField()})}
+    )
+    @action(detail=True, methods=['get'])
+    def stock_summary(self, request, pk=None):
+        category = self.get_object()
+        return Response({
+            'category': category.name,
+            'full_path': category.full_path,
+            'total_products': category.get_all_products().count(),
+            'total_stock': category.get_total_stock(),
+            'total_value': category.get_total_value(),
+        })
+
+    @extend_schema(
+        request=inline_serializer(name='BulkMoveRequest', fields={'category_ids': serializers.ListField(child=serializers.IntegerField()), 'new_parent_id': serializers.IntegerField(required=False, allow_null=True)}),
+        responses={200: inline_serializer(name='BulkMoveResponse', fields={'moved': serializers.ListField(child=serializers.IntegerField()), 'errors': serializers.ListField(child=serializers.DictField())})}
+    )
+    @action(detail=False, methods=['post'])
+    def bulk_move(self, request):
+        category_ids = request.data.get('category_ids', [])
+        new_parent_id = request.data.get('new_parent_id')
+        
+        if not category_ids:
+            return Response({'error': 'category_ids is required'}, status=400)
+
+        new_parent = None
+        if new_parent_id:
+            try:
+                new_parent = Category.objects.get(id=new_parent_id)
+            except Category.DoesNotExist:
+                return Response({'error': 'New parent category not found'}, status=404)
+
+        with transaction.atomic():
+            moved = []
+            errors = []
+            for cat_id in category_ids:
+                try:
+                    category = Category.objects.get(id=cat_id)
+                    if new_parent and category.product_type_id != new_parent.product_type_id:
+                        errors.append({'category_id': cat_id, 'error': 'ProductType mismatch'})
+                        continue
+                    if new_parent and new_parent.is_descendant_of(category):
+                        errors.append({'category_id': cat_id, 'error': 'Would create circular reference'})
+                        continue
+                    category.parent = new_parent
+                    category.save()
+                    moved.append(cat_id)
+                except Category.DoesNotExist:
+                    errors.append({'category_id': cat_id, 'error': 'Category not found'})
+
+        return Response({'moved': moved, 'errors': errors})
+    from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from medicines.core.models import Doctor
+from medicines.api.serializers import DoctorSerializer
+from medicines.api.permissions import IsAdmin, IsPharmacist
+
+class DoctorViewSet(viewsets.ModelViewSet):
+    queryset = Doctor.objects.all()
+    serializer_class = DoctorSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin | IsPharmacist]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        queryset = Doctor.objects.all()
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(license_number__icontains=search))
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        return querysetfrom .auth import login
+from .user import UserViewSet
+from .supplier import SupplierViewSet
+from .product_type import ProductTypeViewSet
+from .category import CategoryViewSet
+from .product import ProductViewSet
+from .sale import SaleViewSet
+from .doctor import DoctorViewSet
+from .patient import PatientViewSet
+from .prescription import PrescriptionViewSet
+from .stock_movement import StockMovementViewSet
+from .report import ReportViewSet
+from .batch import BatchViewSetfrom rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from medicines.core.models import Patient
+from medicines.api.serializers import PatientSerializer
+from medicines.api.permissions import IsAdmin, IsPharmacist
+
+class PatientViewSet(viewsets.ModelViewSet):
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin | IsPharmacist]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        queryset = Patient.objects.all()
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(phone__icontains=search))
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        return queryset
+    
+    @action(detail=False, methods=['get'])
+    def with_allergies(self, request):
+        patients = self.get_queryset().exclude(Q(allergy_notes__isnull=True) | Q(allergy_notes=''))
+        serializer = self.get_serializer(patients, many=True)
+        return Response(serializer.data)from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from medicines.core.models import Prescription
+from medicines.api.serializers import PrescriptionSerializer
+from medicines.api.permissions import IsAdmin, IsPharmacist
+
+class PrescriptionViewSet(viewsets.ModelViewSet):
+    queryset = Prescription.objects.all()
+    serializer_class = PrescriptionSerializer
+    search_fields = ['prescription_number', 'doctor__name', 'patient__name', 'notes']
+
+    def get_permissions(self):
+        if self.action in ['verify', 'reject']:
+            permission_classes = [IsAdmin | IsPharmacist]
+        elif self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin | IsPharmacist]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        queryset = Prescription.objects.all()
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+        patient_id = self.request.query_params.get('patient')
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        doctor_id = self.request.query_params.get('doctor')
+        if doctor_id:
+            queryset = queryset.filter(doctor_id=doctor_id)
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(prescription_date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(prescription_date__lte=end_date)
+        return queryset
+    
+    @action(detail=True, methods=['post'])
+    def verify(self, request, pk=None):
+        prescription = self.get_object()
+        if prescription.status != Prescription.Status.PENDING:
+            return Response({'error': 'Only pending prescriptions can be verified'}, status=400)
+        prescription.status = Prescription.Status.VERIFIED
+        prescription.verified_by = request.user
+        prescription.save()
+        serializer = self.get_serializer(prescription)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        prescription = self.get_object()
+        if prescription.status != Prescription.Status.PENDING:
+            return Response({'error': 'Only pending prescriptions can be rejected'}, status=400)
+        prescription.status = Prescription.Status.REJECTED
+        prescription.verified_by = request.user
+        prescription.save()
+        serializer = self.get_serializer(prescription)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        pending = self.get_queryset().filter(status=Prescription.Status.PENDING)
+        serializer = self.get_serializer(pending, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def verified(self, request):
+        verified = self.get_queryset().filter(status=Prescription.Status.VERIFIED)
+        serializer = self.get_serializer(verified, many=True)
+        return Response(serializer.data)from datetime import timedelta
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.db.models import Sum, Min, Q, F, Case, When, BooleanField
+from medicines.core.models import Product
+from medicines.api.serializers import ProductSerializer
+from medicines.api.permissions import IsAdmin, IsPharmacist
+
+class ProductViewSet(viewsets.ModelViewSet):
+    serializer_class = ProductSerializer
+    search_fields = ['name', 'description']
+
+    def get_queryset(self):
+        queryset = Product.objects.all()
+        
+        # Annotate computed fields for DB-level filtering/sorting
+        queryset = queryset.annotate(
+            total_stock=Sum('batches__quantity', filter=Q(batches__is_active=True)),
+            nearest_expiration=Min('batches__expiration_date', filter=Q(batches__is_active=True))
+        )
+
+        # Filters
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+            
+        category_id = self.request.query_params.get('category')
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+            
+        expired = self.request.query_params.get('expired')
+        if expired == 'true':
+            queryset = queryset.filter(nearest_expiration__lt=timezone.now().date())
+        elif expired == 'false':
+            queryset = queryset.filter(nearest_expiration__gte=timezone.now().date())
+            
+        low_stock = self.request.query_params.get('low_stock')
+        if low_stock == 'true':
+            queryset = queryset.filter(total_stock__lt=10)
+            
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        return queryset
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin | IsPharmacist]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    @action(detail=False, methods=['get'])
+    def low_stock(self, request):
+        qs = self.get_queryset().filter(total_stock__lt=10, is_active=True)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def expiring_soon(self, request):
+        soon = timezone.now().date() + timedelta(days=30)
+        qs = self.get_queryset().filter(
+            nearest_expiration__lte=soon, 
+            nearest_expiration__gte=timezone.now().date(), 
+            is_active=True
+        )
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from medicines.core.models import ProductType
+from medicines.api.serializers import ProductTypeSerializer, CategorySerializer
+from medicines.api.permissions import IsAdmin
+
+class ProductTypeViewSet(viewsets.ModelViewSet):
+    queryset = ProductType.objects.all()
+    serializer_class = ProductTypeSerializer
+    search_fields = ['name']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    @action(detail=True, methods=['get'])
+    def root_categories(self, request, pk):
+        """Get all root categories of a producttype"""
+        product_type = self.get_object()
+        categories = product_type.categories.filter(parent=None, is_active=True)
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def categories(self, request, pk):
+        """Get all categories of a producttype"""
+        product_type = self.get_object()
+        categories = product_type.categories.filter(is_active=True)
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
+
+    def get_queryset(self):
+        queryset = ProductType.objects.all()
+
+        requires_expiration = self.request.query_params.get('requires_expiration')
+        if requires_expiration is not None:
+            queryset = queryset.filter(requires_expiration=requires_expiration.lower() == 'true')
+
+        requires_prescription = self.request.query_params.get('requires_prescription')
+        if requires_prescription is not None:
+            queryset = queryset.filter(requires_prescription=requires_prescription.lower() == 'true')
+
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        return querysetfrom rest_framework import viewsets, serializers
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Sum, Count, Avg, F, Q, Case, When, Value, DecimalField
+from django.utils import timezone
+from django.db.models.functions import TruncDate, TruncMonth, Coalesce
+from datetime import timedelta
+from medicines.core.models import Sale, SaleItem, Product, Prescription
+from drf_spectacular.utils import extend_schema, inline_serializer
+
+def safe_int(value, default):
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+class ReportViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    # 1. NEW: Unified Dashboard Endpoint (Speeds up home page load)
+    @extend_schema(responses=inline_serializer(name='DashboardSummaryResponse', fields={
+        'today_sales': serializers.DictField(), 
+        'pending_rx': serializers.IntegerField(),
+        'low_stock_alerts': serializers.IntegerField(),
+        'expiring_soon_alerts': serializers.IntegerField()
+    }))
+    @action(detail=False, methods=['get'])
+    def dashboard_summary(self, request):
+        today = timezone.now().date()
+        
+        # Today's Sales
+        today_sales_qs = Sale.objects.filter(created_at__date=today)
+        today_sales = today_sales_qs.aggregate(
+            total_revenue=Coalesce(Sum('total_amount'), Value(0, output_field=DecimalField())),
+            total_transactions=Count('id')
+        )
+        
+        # Alerts
+        pending_rx = Prescription.objects.filter(status=Prescription.Status.PENDING).count()
+        low_stock = Product.objects.filter(stock_quantity__lt=10, is_active=True).count()
+        expiring_soon = Product.objects.filter(
+            expiration_date__lte=timezone.now().date() + timedelta(days=30), 
+            expiration_date__gt=timezone.now().date(), 
+            is_active=True
+        ).count()
+
+        return Response({
+            'today_sales': {
+                'total_revenue': today_sales['total_revenue'],
+                'total_transactions': today_sales['total_transactions']
+            },
+            'pending_rx': pending_rx,
+            'low_stock_alerts': low_stock,
+            'expiring_soon_alerts': expiring_soon
+        })
+
+    # 2. ENHANCED: Added Payment Method Breakdown
+    @extend_schema(responses=inline_serializer(name='SalesSummaryResponse', fields={'summary': serializers.DictField(), 'daily_breakdown': serializers.ListField(child=serializers.DictField()), 'payment_breakdown': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def sales_summary(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        sales = Sale.objects.all()
+        if start_date:
+            sales = sales.filter(created_at__date__gte=start_date)
+        if end_date:
+            sales = sales.filter(created_at__date__lte=end_date)
+            
+        summary = sales.aggregate(total_sales=Count('id'), total_revenue=Sum('total_amount'), avg_transaction=Avg('total_amount'))
+        daily_sales = sales.annotate(date=TruncDate('created_at')).values('date').annotate(sales_count=Count('id'), revenue=Sum('total_amount')).order_by('date')
+        
+        # NEW: Payment Method Breakdown for reconciliation
+        payment_breakdown = sales.values('payment_method').annotate(
+            count=Count('id'), 
+            total=Sum('total_amount')
+        ).order_by('payment_method')
+
+        return Response({
+            'summary': {'total_sales': summary['total_sales'] or 0, 'total_revenue': summary['total_revenue'] or 0, 'average_transaction': round(summary['avg_transaction'] or 0, 2)},
+            'daily_breakdown': list(daily_sales),
+            'payment_breakdown': list(payment_breakdown)
+        })
+
+    # 3. ENHANCED: Added Date Filtering to Top Products
+    @extend_schema(responses=inline_serializer(name='TopProductsResponse', fields={'top_products': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def top_products(self, request):
+        limit = safe_int(request.query_params.get('limit'), 10)
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        items = SaleItem.objects.all()
+        if start_date:
+            items = items.filter(sale__created_at__date__gte=start_date)
+        if end_date:
+            items = items.filter(sale__created_at__date__lte=end_date)
+
+        top_items = items.values('product__id', 'product__name', 'product__product_type__name').annotate(total_quantity=Sum('quantity'), total_revenue=Sum(F('quantity') * F('unit_price'))).order_by('-total_quantity')[:limit]
+        return Response({'top_products': list(top_items)})
+
+    # 4. FIX: Aligned low_threshold default to 10
+    @extend_schema(responses=inline_serializer(name='StockAlertsResponse', fields={'low_stock': serializers.ListField(child=serializers.DictField()), 'expiring_soon': serializers.ListField(child=serializers.DictField()), 'expired': serializers.ListField(child=serializers.DictField()), 'thresholds': serializers.DictField()}))
+    @action(detail=False, methods=['get'])
+    def stock_alerts(self, request):
+        low_threshold = safe_int(request.query_params.get('low_threshold'), 10) # Changed from 50 to 10
+        days_ahead = safe_int(request.query_params.get('days_ahead'), 90)
+        expiry_cutoff_date = timezone.now().date() + timedelta(days=days_ahead)
+        low_stock = Product.objects.filter(stock_quantity__lte=low_threshold, is_active=True).values('id', 'name', 'stock_quantity', 'base_unit', 'product_type__name')
+        expiring_soon = Product.objects.filter(expiration_date__lte=expiry_cutoff_date, expiration_date__gt=timezone.now().date(), is_active=True).values('id', 'name', 'expiration_date', 'stock_quantity', 'product_type__name')
+        expired = Product.objects.filter(expiration_date__lt=timezone.now().date(), is_active=True).values('id', 'name', 'expiration_date', 'stock_quantity', 'product_type__name')
+        return Response({'low_stock': list(low_stock), 'expiring_soon': list(expiring_soon), 'expired': list(expired), 'thresholds': {'low_stock': low_threshold, 'expiry_days': days_ahead}})
+
+    @extend_schema(responses=inline_serializer(name='PrescriptionStatsResponse', fields={'status_breakdown': serializers.ListField(child=serializers.DictField()), 'recent_pending': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def prescription_stats(self, request):
+        stats = Prescription.objects.values('status').annotate(count=Count('id')).order_by('status')
+        pending_recent = Prescription.objects.filter(status=Prescription.Status.PENDING).order_by('-created_at')[:10].values('id', 'prescription_number', 'created_at', 'doctor__name', 'patient__name')
+        return Response({'status_breakdown': list(stats), 'recent_pending': list(pending_recent)})
+
+    @extend_schema(responses=inline_serializer(name='MonthlyRevenueResponse', fields={'year': serializers.IntegerField(), 'monthly_data': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def monthly_revenue(self, request):
+        year = safe_int(request.query_params.get('year'), timezone.now().year)
+        monthly = Sale.objects.filter(created_at__year=year).annotate(month=TruncMonth('created_at')).values('month').annotate(sales_count=Count('id'), revenue=Sum('total_amount')).order_by('month')
+        return Response({'year': year, 'monthly_data': list(monthly)})
+
+    @extend_schema(responses=inline_serializer(name='ProductTypeBreakdownResponse', fields={'inventory_by_type': serializers.ListField(child=serializers.DictField()), 'sales_by_type': serializers.ListField(child=serializers.DictField())}))
+    @action(detail=False, methods=['get'])
+    def product_type_breakdown(self, request):
+        by_type = Product.objects.filter(is_active=True).values('product_type__id', 'product_type__name').annotate(product_count=Count('id'), total_stock=Sum('stock_quantity'), total_value=Sum(F('stock_quantity') * F('selling_price')), low_stock_count=Count('id', filter=Q(stock_quantity__lt=10)), expired_count=Count('id', filter=Q(expiration_date__lt=timezone.now().date()))).order_by('product_type__name')
+        sales_by_type = SaleItem.objects.values('product__product_type__id', 'product__product_type__name').annotate(items_sold=Sum('quantity'), revenue=Sum('subtotal')).order_by('-revenue')
+        return Response({'inventory_by_type': list(by_type), 'sales_by_type': list(sales_by_type)})from rest_framework import viewsets, serializers
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.db.models import Sum, Count
+from medicines.core.models import *
+from medicines.api.serializers import SaleSerializer
+from medicines.api.permissions import IsAdmin, IsCashier
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework.decorators import action
+from rest_framework import status
+from django.db import transaction
+from django.core.exceptions import ValidationError
+import datetime
+
+class SaleViewSet(viewsets.ModelViewSet):
+    queryset = Sale.objects.all()
+    serializer_class = SaleSerializer
+    search_fields = ['sale_number', 'notes']
+
+    def get_permissions(self):
+        if self.action == 'create':
+            permission_classes = [IsAdmin | IsCashier]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        queryset = Sale.objects.all()
+        if self.request.user.role == 'cashier':
+            queryset = queryset.filter(cashier=self.request.user)
+            
+        # FIX: Robust date filtering
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            try:
+                start_dt = timezone.make_aware(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                queryset = queryset.filter(created_at__gte=start_dt)
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                end_dt = timezone.make_aware(datetime.datetime.strptime(end_date, '%Y-%m-%d') + datetime.timedelta(days=1))
+                queryset = queryset.filter(created_at__lt=end_dt)
+            except ValueError:
+                pass
+                
+        cashier_id = self.request.query_params.get('cashier')
+        if cashier_id:
+            queryset = queryset.filter(cashier_id=cashier_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(cashier=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def today(self, request):
+        today = timezone.now().date()
+        sales = self.queryset.filter(created_at__date=today)
+        serializer = self.get_serializer(sales, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def my_sales(self, request):
+        sales = self.queryset.filter(cashier=request.user)
+        serializer = self.get_serializer(sales, many=True)
+        return Response(serializer.data)
+    
+    @extend_schema(
+        responses=inline_serializer(name='SaleReportResponse', fields={'today': serializers.DictField(), 'this_month': serializers.DictField()})
+    )
+    @action(detail=False, methods=['get'])
+    def report(self, request):
+        today = timezone.now().date()
+        today_sales = Sale.objects.filter(created_at__date=today)
+        today_total = today_sales.aggregate(total=Sum('total_amount'), count=Count('id'))
+        month_start = today.replace(day=1)
+        month_sales = Sale.objects.filter(created_at__date__gte=month_start)
+        month_total = month_sales.aggregate(total=Sum('total_amount'), count=Count('id'))
+        return Response({
+            'today': {'total_sales': today_total['total'] or 0, 'transaction_count': today_total['count'] or 0},
+            'this_month': {'total_sales': month_total['total'] or 0, 'transaction_count': month_total['count'] or 0}
+        })
+    
+    @action(detail=False, methods=['post'], url_path='checkout', permission_classes=[IsAuthenticated])
+    def checkout(self, request):
+        """
+        Atomic POS checkout endpoint.
+        Payload: { "items": [{"product_id": 1, "quantity": 2}], "payment_method": "cash", "prescription_id": null }
+        """
+        items_data = request.data.get('items', [])
+        payment_method = request.data.get('payment_method', Sale.PaymentMethod.CASH)
+        prescription_id = request.data.get('prescription_id')
+
+        if not items_data:
+            return Response({"error": "Cart is empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                # 1. Lock the prescription row if provided (prevent double-dispense)
+                prescription = None
+                if prescription_id:
+                    prescription = Prescription.objects.select_for_update().get(pk=prescription_id)
+                    if prescription.status != Prescription.Status.VERIFIED:
+                        raise ValidationError(f"Prescription must be verified. Current status: {prescription.status}")
+
+                # 2. Create the Sale object
+                sale = Sale.objects.create(
+                    cashier=request.user,
+                    payment_method=payment_method,
+                    prescription=prescription
+                )
+
+                # 3. Process items: Validate stock, calculate prices, create movements
+                sale_items_payload = []
+                for item_data in items_data:
+                    product_id = item_data.get('product_id')
+                    quantity = int(item_data.get('quantity', 0))
+
+                    if quantity <= 0:
+                        raise ValidationError(f"Invalid quantity for product ID {product_id}")
+
+                    # Lock the product row for atomic stock check & deduction
+                    product = Product.objects.select_for_update().get(pk=product_id)
+
+                    if product.stock_quantity < quantity:
+                        raise ValidationError(f"Insufficient stock for {product.name}. Available: {product.stock_quantity}")
+
+                    if product.effective_requires_prescription and not prescription:
+                        raise ValidationError(f"Product {product.name} requires a prescription.")
+
+                    # Server-side price calculation (never trust client)
+                    unit_price = product.selling_price
+                    subtotal = unit_price * quantity
+
+                    sale_item = SaleItem.objects.create(
+                        sale=sale,
+                        product=product,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        subtotal=subtotal
+                    )
+                    # SaleItem.save() automatically creates the StockMovement and updates product stock
+
+                # 4. Update Prescription Status if applicable
+                if prescription:
+                    prescription.status = Prescription.Status.DISPENSED
+                    prescription.save(update_fields=['status'])
+
+                # 5. Serialize and return the successful sale
+                serializer = self.get_serializer(sale)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Product.DoesNotExist:
+            return Response({"error": "One or more products not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Prescription.DoesNotExist:
+            return Response({"error": "Prescription not found."}, status=status.HTTP_404_NOT_FOUND)
+        except ValidationError as e:
+            return Response({"error": str(e.message_dict if hasattr(e, 'message_dict') else e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": "An unexpected error occurred during checkout."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)import datetime
+from django.utils import timezone
+from rest_framework import viewsets, serializers
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from medicines.core.models import StockMovement
+from medicines.api.serializers import StockMovementSerializer
+from medicines.api.permissions import IsAdmin, IsPharmacist
+from drf_spectacular.utils import extend_schema, inline_serializer
+
+class StockMovementViewSet(viewsets.ModelViewSet):
+    queryset = StockMovement.objects.all()
+    serializer_class = StockMovementSerializer
+    search_fields = ['product__name', 'supplier', 'reference']
+
+    def get_permissions(self):
+        if self.action == 'create':
+            permission_classes = [IsAdmin | IsPharmacist]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        queryset = StockMovement.objects.all()
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
+        movement_type = self.request.query_params.get('movement_type')
+        if movement_type:
+            queryset = queryset.filter(movement_type=movement_type)
+        direction = self.request.query_params.get('direction')
+        if direction == 'in':
+            in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+            queryset = queryset.filter(movement_type__in=in_reasons)
+        elif direction == 'out':
+            out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+            queryset = queryset.filter(movement_type__in=out_reasons)
+        supplier_id = self.request.query_params.get('supplier')
+        if supplier_id:
+            queryset = queryset.filter(supplier_id=supplier_id)
+        sale_id = self.request.query_params.get('sale')
+        if sale_id:
+            queryset = queryset.filter(sale_id=sale_id)
+            
+        # FIX: Robust date filtering
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            try:
+                start_dt = timezone.make_aware(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                queryset = queryset.filter(created_at__gte=start_dt)
+            except ValueError:
+                pass # Ignore invalid date format
+        if end_date:
+            try:
+                # Use __lt the NEXT day to include all times on the end_date
+                end_dt = timezone.make_aware(datetime.datetime.strptime(end_date, '%Y-%m-%d') + datetime.timedelta(days=1))
+                queryset = queryset.filter(created_at__lt=end_dt)
+            except ValueError:
+                pass
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def stock_in(self, request):
+        in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+        movements = self.get_queryset().filter(movement_type__in=in_reasons) # Use get_queryset to respect filters
+        serializer = self.get_serializer(movements, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stock_out(self, request):
+        out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+        movements = self.get_queryset().filter(movement_type__in=out_reasons)
+        serializer = self.get_serializer(movements, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        responses=inline_serializer(name='StockMovementSummaryResponse', fields={'total_in': serializers.IntegerField(), 'total_out': serializers.IntegerField(), 'net_change': serializers.IntegerField()})
+    )
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        from django.db.models import Sum
+        queryset = self.get_queryset() # Re-use get_queryset to apply all filters automatically!
+        
+        in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+        out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+        total_in = queryset.filter(movement_type__in=in_reasons).aggregate(total=Sum('quantity'))['total'] or 0
+        total_out = queryset.filter(movement_type__in=out_reasons).aggregate(total=Sum('quantity'))['total'] or 0
+        return Response({'total_in': total_in, 'total_out': total_out, 'net_change': total_in - total_out})
+
+    @action(detail=False, methods=['get'])
+    def stock_in(self, request):
+        in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+        movements = self.queryset.filter(movement_type__in=in_reasons)
+        serializer = self.get_serializer(movements, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stock_out(self, request):
+        out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+        movements = self.queryset.filter(movement_type__in=out_reasons)
+        serializer = self.get_serializer(movements, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        responses=inline_serializer(name='StockMovementSummaryResponse', fields={'total_in': serializers.IntegerField(), 'total_out': serializers.IntegerField(), 'net_change': serializers.IntegerField()})
+    )
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        from django.db.models import Sum
+        product_id = request.query_params.get('product')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        queryset = StockMovement.objects.all()
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+        in_reasons = [r.value for r in StockMovement.Reason.get_in_reasons()]
+        out_reasons = [r.value for r in StockMovement.Reason.get_out_reasons()]
+        total_in = queryset.filter(movement_type__in=in_reasons).aggregate(total=Sum('quantity'))['total'] or 0
+        total_out = queryset.filter(movement_type__in=out_reasons).aggregate(total=Sum('quantity'))['total'] or 0
+        return Response({'total_in': total_in, 'total_out': total_out, 'net_change': total_in - total_out})from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from medicines.core.models import Supplier
+from medicines.api.serializers import SupplierSerializer
+from medicines.api.permissions import IsAdmin
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    queryset = Supplier.objects.all()
+    serializer_class = SupplierSerializer
+    search_fields = ['name']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from medicines.core.models import User
+from medicines.api.serializers import UserSerializer
+from medicines.api.permissions import IsAdmin
+from django.db import models
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    search_fields = ['username', 'first_name', 'last_name']
+
+    def get_queryset(self):
+        queryset = User.objects.all()
+        
+        # Text search matching your previous search_fields
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                models.Q(username__icontains=search) |
+                models.Q(first_name__icontains=search) |
+                models.Q(last_name__icontains=search)
+            )
+            
+        # Explicitly filter by role query parameter (?role=cashier)
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+            
+        return queryset
+
+    def get_permissions(self):
+        if self.action == 'me':
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAdmin]
+        return [permission() for permission in permission_classes]
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """Get current logged-in user info"""
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)

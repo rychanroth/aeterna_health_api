@@ -3,8 +3,7 @@ import string
 import secrets
 from decimal import Decimal
 from django.db import models, transaction
-# FIX 1: Import DRF's ValidationError so the API turns these into clean 400 JSON responses
-from rest_framework.exceptions import ValidationError
+from django.core.exceptions import ValidationError
 from .abstracts import CoreAbstractModel
 
 def generate_sale_number():
