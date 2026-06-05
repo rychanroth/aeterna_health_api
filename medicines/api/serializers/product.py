@@ -9,30 +9,18 @@ class ProductSerializer(serializers.ModelSerializer):
     suppliers = SupplierSerializer(many=True, read_only=True)
     product_type = ProductTypeSerializer(read_only=True)
 
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(),
-        source='category',
-        write_only=True,
-        allow_null=True,
-        required=False
-    )
-    supplier_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Supplier.objects.all(),
-        source='suppliers',
-        many=True,
-        write_only=True,
-        required=False
-    )
-    product_type_id = serializers.PrimaryKeyRelatedField(
-        queryset=ProductType.objects.all(),
-        source='product_type',
-        write_only=True,
-        allow_null=True,
-        required=False
-    )
+    category_id = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), source='category', write_only=True, allow_null=True, required=False)
+    supplier_ids = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all(), source='suppliers', many=True, write_only=True, required=False)
+    product_type_id = serializers.PrimaryKeyRelatedField(queryset=ProductType.objects.all(), source='product_type', write_only=True, allow_null=True, required=False)
+
+    # REMOVED: is_expired, is_low_stock (Replaced by computed logic below)
+    effective_requires_prescription = serializers.BooleanField(read_only=True)
+    
+    # NEW: Computed fields from Batches
+    total_stock = serializers.IntegerField(read_only=True)
+    nearest_expiration = serializers.DateField(read_only=True, allow_null=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_low_stock = serializers.BooleanField(read_only=True)
-    effective_requires_prescription = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Product
@@ -41,12 +29,12 @@ class ProductSerializer(serializers.ModelSerializer):
             'product_type', 'product_type_id', 'base_unit',
             'category', 'category_id',
             'suppliers', 'supplier_ids', 'description',
-            'selling_price', 'stock_quantity',
-            'expiration_date', 'requires_prescription', 'effective_requires_prescription',
+            'selling_price', 'total_stock', 'nearest_expiration',
+            'requires_prescription', 'effective_requires_prescription',
             'is_active', 'is_expired', 'is_low_stock',
             'created_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'total_stock', 'nearest_expiration', 'is_expired', 'is_low_stock']
 
     def validate_selling_price(self, value):
         if value <= 0:

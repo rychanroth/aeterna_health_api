@@ -1,8 +1,8 @@
 from rest_framework import serializers
-from medicines.core.models import StockMovement, Product, Supplier, Sale
-
+from medicines.core.models import StockMovement, Batch, Supplier, Sale
 class StockMovementSerializer(serializers.ModelSerializer):
-    product_name = serializers.ReadOnlyField(source='product.name')
+    product_name = serializers.ReadOnlyField(source='batch.product.name')
+    batch_number = serializers.ReadOnlyField(source='batch.batch_number')
     supplier_name = serializers.ReadOnlyField(source='supplier.name')
     sale_number = serializers.ReadOnlyField(source='sale.sale_number')
     created_by_name = serializers.SerializerMethodField()
@@ -10,31 +10,24 @@ class StockMovementSerializer(serializers.ModelSerializer):
     is_stock_out = serializers.BooleanField(read_only=True)
     movement_direction = serializers.ReadOnlyField()
     
-    product_id = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(),
-        source='product',
+    # NEW: Target Batch, not Product
+    batch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Batch.objects.all(),
+        source='batch',
         write_only=True
     )
     supplier_id = serializers.PrimaryKeyRelatedField(
-        queryset=Supplier.objects.all(),
-        source='supplier',
-        write_only=True,
-        allow_null=True,
-        required=False
+        queryset=Supplier.objects.all(), source='supplier', write_only=True, allow_null=True, required=False
     )
     sale_id = serializers.PrimaryKeyRelatedField(
-        queryset=Sale.objects.all(),
-        source='sale',
-        write_only=True,
-        allow_null=True,
-        required=False
+        queryset=Sale.objects.all(), source='sale', write_only=True, allow_null=True, required=False
     )
     
     class Meta:
         model = StockMovement
         fields = [
-            'id', 'product_name', 'product_id',
-            'movement_type', 'quantity', 'unit_cost',
+            'id', 'product_name', 'batch_number', 'batch_id',
+            'movement_type', 'quantity',
             'supplier_name', 'supplier_id',
             'sale_number', 'sale_id',
             'reference', 'notes',

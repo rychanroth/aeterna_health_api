@@ -45,13 +45,7 @@ class Sale(CoreAbstractModel):
         # CONSTRAINT ENFORCEMENT: Cannot delete a sale audit trail
         raise ValidationError("Sales cannot be deleted as they are immutable audit records.")
 
-
-from django.db import models, transaction
-from django.core.exceptions import ValidationError
-from decimal import Decimal
-from .abstracts import UpdatableAbstractModel
-
-class SaleItem(UpdatableAbstractModel):
+class SaleItem(CoreAbstractModel):
     sale = models.ForeignKey('Sale', on_delete=models.CASCADE, related_name='items')
     
     # CHANGE: Link to Batch for traceability

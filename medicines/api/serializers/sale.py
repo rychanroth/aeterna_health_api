@@ -1,38 +1,48 @@
 from rest_framework import serializers
 from django.db import transaction
-from medicines.core.models import Sale, SaleItem, Product, Prescription
+from medicines.core.models import Sale, SaleItem, Product, Prescription, Batch
 
 class SaleItemSerializer(serializers.ModelSerializer):
+    # Read-only expansions for display
     product_name = serializers.ReadOnlyField(source='product.name')
-    product_id = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(),
-        source='product',
+    batch_number = serializers.ReadOnlyField(source='batch.batch_number')
+    
+    # Write-only relational IDs
+    # We now target the Batch, not the Product directly
+    batch_id = serializers.PrimaryKeyRelatedField(
+        queryset=Batch.objects.all(),
+        source='batch',
         write_only=True
     )
 
     class Meta:
         model = SaleItem
         fields = [
-            'id', 'product_name', 'product_id',
+            'id', 'product_name', 'batch_number', 'batch_id',
             'quantity', 'unit_price', 'subtotal',
         ]
-        read_only_fields = ['id', 'subtotal']
-    
-    def validate_quantity(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Quantity must be greater than 0")
-        return value
-    
+        read_only_fields = ['id', 'subtotal', 'product_name', 'batch_number'] # product_name derived in create
+
     def validate(self, data):
         data = super().validate(data)
-        product = data.get('product')
-
-        if product:
-            if product.is_expired:
+        batch = data.get('batch')
+        quantity = data.get('quantity', 0)
+        
+        # Validation: Check if the batch has enough stock
+        if batch and quantity > 0:
+            if batch.quantity < quantity:
                 raise serializers.ValidationError(
-                    f"Cannot sell expired products. Expired on {product.expiration_date}"
+                    f"Insufficient stock in Batch {batch.batch_number}. Available: {batch.quantity}"
                 )
         return data
+
+    def create(self, validated_data):
+        # Denormalization: Auto-fill the product from the selected batch
+        batch = validated_data.get('batch')
+        if batch and 'product' not in validated_data:
+            validated_data['product'] = batch.product
+            
+        return super().create(validated_data)
 
 class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True)
