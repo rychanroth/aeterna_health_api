@@ -1,7 +1,8 @@
 # medicines/api/filters.py
 import django_filters
+from django.db.models import Q
 from django.utils import timezone
-from medicines.core.models import Product, Batch, Category, ProductType
+from medicines.core.models import *
 
 class ProductFilter(django_filters.FilterSet):
     # Method filters for annotated/computed fields
@@ -67,3 +68,42 @@ class ProductTypeFilter(django_filters.FilterSet):
             'requires_prescription': ['exact'],
             'is_active': ['exact'],
         }
+
+class UserFilter(django_filters.FilterSet):
+    class Meta:
+        model = User
+        fields = {
+            'role': ['exact'],
+            'is_active': ['exact'],
+        }
+
+class SupplierFilter(django_filters.FilterSet):
+    class Meta:
+        model = Supplier
+        fields = {
+            'is_active': ['exact'],
+        }
+
+class DoctorFilter(django_filters.FilterSet):
+    class Meta:
+        model = Doctor
+        fields = {
+            'is_active': ['exact'],
+        }
+
+class PatientFilter(django_filters.FilterSet):
+    # Method filter to replace the old custom action
+    with_allergies = django_filters.BooleanFilter(method='filter_with_allergies', label='Has Allergies')
+
+    class Meta:
+        model = Patient
+        fields = {
+            'is_active': ['exact'],
+            'gender': ['exact'],
+        }
+
+    def filter_with_allergies(self, queryset, name, value):
+        if value:
+            # Exclude null/empty allergy notes
+            return queryset.exclude(Q(allergy_notes__isnull=True) | Q(allergy_notes=''))
+        return queryset
