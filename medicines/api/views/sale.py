@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Sum, Count
-from medicines.core.models import *
 from medicines.api.serializers import SaleSerializer
 from medicines.api.permissions import IsAdmin, IsCashier
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -13,11 +12,14 @@ from rest_framework import status
 from django.db import transaction
 from django.core.exceptions import ValidationError
 import datetime
+from medicines.core.models import Sale, Prescription, Product, SaleItem
+from medicines.api.filters import SaleFilter
 
 class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
     serializer_class = SaleSerializer
     search_fields = ['sale_number', 'notes']
+    filterset_class = SaleFilter
 
     def get_permissions(self):
         if self.action == 'create':
@@ -29,29 +31,10 @@ class SaleViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
-        queryset = Sale.objects.all()
+        # We only override get_queryset for authorization scoping now
+        queryset = super().get_queryset()
         if self.request.user.role == 'cashier':
             queryset = queryset.filter(cashier=self.request.user)
-            
-        # FIX: Robust date filtering
-        start_date = self.request.query_params.get('start_date')
-        end_date = self.request.query_params.get('end_date')
-        if start_date:
-            try:
-                start_dt = timezone.make_aware(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
-                queryset = queryset.filter(created_at__gte=start_dt)
-            except ValueError:
-                pass
-        if end_date:
-            try:
-                end_dt = timezone.make_aware(datetime.datetime.strptime(end_date, '%Y-%m-%d') + datetime.timedelta(days=1))
-                queryset = queryset.filter(created_at__lt=end_dt)
-            except ValueError:
-                pass
-                
-        cashier_id = self.request.query_params.get('cashier')
-        if cashier_id:
-            queryset = queryset.filter(cashier_id=cashier_id)
         return queryset
 
     def perform_create(self, serializer):
@@ -60,16 +43,16 @@ class SaleViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def today(self, request):
         today = timezone.now().date()
-        sales = self.queryset.filter(created_at__date=today)
+        sales = self.get_queryset().filter(created_at__date=today)
         serializer = self.get_serializer(sales, many=True)
         return Response(serializer.data)
-    
+
     @action(detail=False, methods=['get'])
     def my_sales(self, request):
-        sales = self.queryset.filter(cashier=request.user)
+        sales = self.get_queryset().filter(cashier=request.user)
         serializer = self.get_serializer(sales, many=True)
         return Response(serializer.data)
-    
+
     @extend_schema(
         responses=inline_serializer(name='SaleReportResponse', fields={'today': serializers.DictField(), 'this_month': serializers.DictField()})
     )
