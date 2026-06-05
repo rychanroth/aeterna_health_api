@@ -1,17 +1,6 @@
 """
 Test Suite: POS Checkout API Endpoint
 ======================================
-
-Validates the SaleViewSet.checkout() atomic transaction flow.
-This is the highest-risk endpoint as it mutates 4 models atomically.
-
-Business Rules Under Test:
---------------------------
-1. Happy path: Single item, multi-item, and prescription sales
-2. Stock validation: Insufficient stock and atomic rollback
-3. Prescription validation: Required products, unverified/dispensed RX
-4. Input validation: Empty cart, invalid product, negative quantity
-5. Payment method handling
 """
 
 from decimal import Decimal
@@ -21,7 +10,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from medicines.core.models import (
-    Product, Sale, SaleItem, StockMovement,
+    Product, Sale, SaleItem, StockMovement, Batch,
     Prescription, Doctor, Patient
 )
 from .helpers import *
@@ -41,8 +30,8 @@ class CheckoutAPITestCase(TestCase):
             is_staff=True
         )
         self.client = create_authenticated_client(self.cashier)
-        
-        # Standard products
+
+        # Standard products (Helper creates 1 batch per product automatically)
         self.product_a = create_product_with_stock(
             name='Checkout Product A',
             stock_quantity=100,
@@ -55,7 +44,7 @@ class CheckoutAPITestCase(TestCase):
             selling_price=Decimal('20.00'),
             created_by=self.cashier
         )
-        
+
         # Prescription-required product
         self.rx_product = create_product_with_stock(
             name='Prescription Medication',
@@ -63,13 +52,14 @@ class CheckoutAPITestCase(TestCase):
             selling_price=Decimal('15.00'),
             created_by=self.cashier,
             product_type_name='Medicine',
-            requires_prescription=True
+            requires_prescription=True,
+            requires_expiration=True
         )
-        
+
         # Prescription prerequisites
         self.doctor = Doctor.objects.create(name='Dr. Checkout')
         self.patient = Patient.objects.create(name='Patient Checkout')
-        
+
         self.url = reverse('sale-checkout')
 
     def _create_prescription(self, status=Prescription.Status.VERIFIED):
@@ -87,23 +77,22 @@ class CheckoutAPITestCase(TestCase):
     # =========================================================================
 
     def test_checkout_single_item(self):
-        """Verify successful checkout of a single item."""
+        """Verify successful checkout of a single item using FEFO."""
         payload = {
             "items": [{"product_id": self.product_a.id, "quantity": 5}],
             "payment_method": "cash"
         }
-        
+
         response = self.client.post(self.url, payload, format='json')
-        
+
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Sale.objects.count(), 1)
         self.assertEqual(SaleItem.objects.count(), 1)
-        
-        # Verify stock deducted
+
+        # FIX: Verify stock deducted using computed property
         self.product_a.refresh_from_db()
-        self.assertEqual(self.product_a.stock_quantity, 95)
-        
-        # Verify total calculated
+        self.assertEqual(self.product_a.total_stock, 95)
+
         sale = Sale.objects.first()
         self.assertEqual(sale.total_amount, Decimal('50.00'))
         self.assertEqual(sale.cashier, self.cashier)
@@ -117,45 +106,91 @@ class CheckoutAPITestCase(TestCase):
             ],
             "payment_method": "card"
         }
-        
+
         response = self.client.post(self.url, payload, format='json')
-        
+
         self.assertEqual(response.status_code, 201)
-        
-        # Verify both stocks deducted
+
+        # FIX: Verify both stocks deducted using computed property
         self.product_a.refresh_from_db()
         self.product_b.refresh_from_db()
-        self.assertEqual(self.product_a.stock_quantity, 98)
-        self.assertEqual(self.product_b.stock_quantity, 47)
-        
-        # Verify total = (2*10) + (3*20) = 80
+        self.assertEqual(self.product_a.total_stock, 98)
+        self.assertEqual(self.product_b.total_stock, 47)
+
         sale = Sale.objects.first()
         self.assertEqual(sale.total_amount, Decimal('80.00'))
 
     def test_checkout_with_verified_rx(self):
         """Verify successful checkout linking a verified prescription."""
         rx = self._create_prescription(status=Prescription.Status.VERIFIED)
-        
+
         payload = {
             "items": [{"product_id": self.rx_product.id, "quantity": 1}],
             "payment_method": "insurance",
             "prescription_id": rx.id
         }
-        
+
         response = self.client.post(self.url, payload, format='json')
-        
+
         self.assertEqual(response.status_code, 201)
-        
-        # Verify prescription status updated to DISPENSED
+
         rx.refresh_from_db()
         self.assertEqual(rx.status, Prescription.Status.DISPENSED)
-        
-        # Verify sale linked to prescription
+
         sale = Sale.objects.first()
         self.assertEqual(sale.prescription_id, rx.id)
 
     # =========================================================================
-    # GROUP 2: Stock Validation
+    # GROUP 2: FEFO Allocation
+    # =========================================================================
+
+    def test_checkout_fefo_allocation(self):
+        """Verify checkout automatically deducts from the batch expiring soonest."""
+        # Create a second batch for Product A that expires sooner
+        batch_expiring_soon = Batch.objects.create(
+            product=self.product_a,
+            quantity=10,
+            expiration_date=date.today() + timedelta(days=10), # Sooner
+            cost_price=Decimal('5.00')
+        )
+        # Original batch expires in 365 days
+        
+        self.product_a.refresh_from_db()
+        self.assertEqual(self.product_a.total_stock, 110) # 100 original + 10 new
+
+        payload = {
+            "items": [{"product_id": self.product_a.id, "quantity": 15}],
+            "payment_method": "cash"
+        }
+
+        response = self.client.post(self.url, payload, format='json')
+        self.assertEqual(response.status_code, 201)
+
+        batch_expiring_soon.refresh_from_db()
+        original_batch = self.product_a.batches.exclude(pk=batch_expiring_soon.pk).first()
+        original_batch.refresh_from_db()
+
+        # FEFO should empty the soon-expiring batch first, then take 5 from the original
+        self.assertEqual(batch_expiring_soon.quantity, 0)
+        self.assertEqual(original_batch.quantity, 95)
+
+    def test_checkout_explicit_batch_id(self):
+        """Verify checkout succeeds when forcing a specific batch_id."""
+        batch_to_buy = self.product_a.batches.first()
+
+        payload = {
+            "items": [{"product_id": self.product_a.id, "quantity": 5, "batch_id": batch_to_buy.id}],
+            "payment_method": "cash"
+        }
+
+        response = self.client.post(self.url, payload, format='json')
+        self.assertEqual(response.status_code, 201)
+
+        batch_to_buy.refresh_from_db()
+        self.assertEqual(batch_to_buy.quantity, 95) # 100 - 5
+
+    # =========================================================================
+    # GROUP 3: Stock Validation
     # =========================================================================
 
     def test_checkout_insufficient_stock(self):
@@ -164,23 +199,20 @@ class CheckoutAPITestCase(TestCase):
             "items": [{"product_id": self.product_a.id, "quantity": 999}],
             "payment_method": "cash"
         }
-        
+
         response = self.client.post(self.url, payload, format='json')
-        
+
         self.assertEqual(response.status_code, 400)
         self.assertIn('Insufficient stock', str(response.data))
-        
-        # Verify no records created
+
         self.assertEqual(Sale.objects.count(), 0)
         self.assertEqual(SaleItem.objects.count(), 0)
-        
-        # Verify stock unchanged
+
         self.product_a.refresh_from_db()
-        self.assertEqual(self.product_a.stock_quantity, 100)
+        self.assertEqual(self.product_a.total_stock, 100) # Unchanged
 
     def test_checkout_partial_stock_fail(self):
         """Verify entire transaction rolls back if second item fails stock check."""
-        # Product A has 100 stock, Product B has 50 stock
         payload = {
             "items": [
                 {"product_id": self.product_a.id, "quantity": 10},  # Valid
@@ -188,21 +220,21 @@ class CheckoutAPITestCase(TestCase):
             ],
             "payment_method": "cash"
         }
-        
+
         response = self.client.post(self.url, payload, format='json')
-        
+
         self.assertEqual(response.status_code, 400)
-        
+
         # Verify NO records created (atomicity)
         self.assertEqual(Sale.objects.count(), 0)
         self.assertEqual(SaleItem.objects.count(), 0)
         self.assertEqual(StockMovement.objects.filter(movement_type=StockMovement.Reason.SALE).count(), 0)
-        
+
         # Verify BOTH stocks unchanged
         self.product_a.refresh_from_db()
         self.product_b.refresh_from_db()
-        self.assertEqual(self.product_a.stock_quantity, 100)
-        self.assertEqual(self.product_b.stock_quantity, 50)
+        self.assertEqual(self.product_a.total_stock, 100)
+        self.assertEqual(self.product_b.total_stock, 50)
 
     # =========================================================================
     # GROUP 3: Prescription Validation
