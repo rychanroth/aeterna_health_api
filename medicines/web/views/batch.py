@@ -4,6 +4,7 @@ from django.contrib import messages
 from urllib.parse import urlencode
 from medicines.web.api_helper import *
 from medicines.web.decorators import *
+from django.utils.dateparse import parse_date
 
 @login_required_template
 @pharmacy_staff_required
@@ -49,4 +50,40 @@ def batch_list(request):
         'is_active': is_active,
         'is_expired': is_expired,
         'expiring_soon': expiring_soon,
+    })
+
+@pharmacy_staff_required
+def batch_detail(request, id):
+    token = request.session.get('token')
+    
+    # 1. Fetch the Batch data
+    batch_response = api_call('GET', f'/api/batches/{id}/', token=token)
+    if batch_response.status_code != 200:
+        messages.error(request, 'Batch not found.')
+        return redirect('template-batch-list')
+    batch = batch_response.json()
+
+    if batch.get('expiration_date'):
+        batch['expiration_date'] = parse_date(batch['expiration_date'])
+
+    # 2. Fetch the Stock Movements for this specific Batch
+    current_page = request.GET.get('page', 1)
+    api_url = f'/api/stock-movements/?batch={id}&page={current_page}&ordering=-created_at'
+    movements_response = api_call('GET', api_url, token=token)
+
+    movements, next_page, prev_page, count = [], None, None, 0
+    if movements_response.status_code == 200:
+        data = movements_response.json()
+        movements = data.get('results', [])
+        count = data.get('count', 0)
+        if data.get('next'): next_page = data['next'].split('page=')[-1]
+        if data.get('previous'): prev_page = 1 if 'page=' not in data['previous'] else data['previous'].split('page=')[-1]
+
+    return render(request, 'batches/batch_detail.html', {
+        'batch': batch,
+        'movements': movements,
+        'count': count,
+        'next_page': next_page,
+        'prev_page': prev_page,
+        'current_page': current_page,
     })

@@ -57,6 +57,7 @@ urlpatterns = [
 
     # BATCH
     path('batches/', batch_list, name='template-batch-list'),
+    path('batches/<int:id>', batch_detail, name='template-batch-detail'),
 
     # PRODUCT
     path('products/', product_list, name='template-product-list'),

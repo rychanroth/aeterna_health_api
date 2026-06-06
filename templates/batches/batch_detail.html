@@ -1,0 +1,152 @@
+    {% extends 'base.html' %}
+
+    {% block title %}Batch: {{ batch.batch_number }}{% endblock %}
+    {% block page_title %}Batch Details{% endblock %}
+
+    {% block content %}
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+
+    <div class="mb-4">
+        <a href="{% url 'template-batch-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Inventory Lots</a>
+    </div>
+
+    <!-- Status Banner -->
+    <div class="mb-6 rounded-lg border-l-4 p-4 flex items-center justify-between shadow-sm 
+        {% if not batch.is_active %}bg-gray-50 border-gray-400
+        {% elif batch.is_expired %}bg-red-50 border-red-500
+        {% else %}bg-green-50 border-green-500{% endif %}">
+        <div class="flex items-center gap-3">
+            <i class='bx bx-package text-2xl 
+                {% if not batch.is_active %}text-gray-500
+                {% elif batch.is_expired %}text-red-500
+                {% else %}text-green-500{% endif %}'></i>
+            <div>
+                <h2 class="text-xl font-bold text-gray-900">{{ batch.batch_number }}</h2>
+                <p class="text-sm text-gray-600">Product: <strong>{{ batch.product_name }}</strong></p>
+            </div>
+        </div>
+        <div class="text-right">
+            {% if not batch.is_active %}
+            <span class="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold text-sm">INACTIVE / DEPLETED</span>
+            {% elif batch.is_expired %}
+            <span class="bg-red-100 text-red-700 px-3 py-1 rounded font-bold text-sm">EXPIRED</span>
+            {% else %}
+            <span class="bg-green-100 text-green-700 px-3 py-1 rounded font-bold text-sm">ACTIVE</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Batch Info Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white p-6 rounded shadow col-span-2 space-y-6 text-sm">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 border-b pb-4">
+                <div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Current Qty</p>
+                    <p class="font-black text-3xl {% if batch.quantity <= 0 %}text-gray-400{% elif batch.quantity < 10 %}text-amber-600{% else %}text-gray-900{% endif %}">{{ batch.quantity }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Cost Price</p>
+                    <p class="font-bold text-xl text-gray-900">$ {{ batch.cost_price|default:"N/A" }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Expiration</p>
+                    <p class="font-bold text-lg 
+                        {% if not batch.expiration_date %}text-gray-400
+                        {% elif batch.is_expired %}text-red-600
+                        {% else %}text-gray-900{% endif %}">
+                        {{ batch.expiration_date }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Received</p>
+                    <p class="font-bold text-lg text-gray-900">{{ batch.received_date }}</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Supplier</p>
+                    <p class="font-semibold text-gray-800">{{ batch.supplier_name|default:"Not Specified" }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Created At</p>
+                    <p class="font-semibold text-gray-800">{{ batch.created_at|date:"M d, Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Link Card -->
+        <div class="bg-white p-6 rounded shadow col-span-1 flex flex-col justify-center items-center text-center border border-gray-100">
+            <i class='bx bx-capsule text-4xl text-blue-500 mb-2'></i>
+            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Belongs to Product</p>
+            <!-- Assuming batch.product contains the product ID from the serializer -->
+            <a href="{% url 'template-product-detail' batch.product %}" class="text-lg font-bold text-blue-600 hover:underline">
+                {{ batch.product_name }}
+            </a>
+        </div>
+    </div>
+
+    <!-- Stock Movement Audit Trail -->
+    <div class="bg-white rounded shadow overflow-hidden">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800">Stock Movement Ledger</h3>
+            <span class="text-sm text-gray-500">Total Records: {{ count }}</span>
+        </div>
+
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-100 border-b text-xs text-gray-600 uppercase tracking-wider">
+                    <th class="p-3">Date</th>
+                    <th class="p-3">Reason</th>
+                    <th class="p-3 text-right">Quantity Change</th>
+                    <th class="p-3">Reference</th>
+                    <th class="p-3">Created By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mov in movements %}
+                <tr class="border-b hover:bg-gray-50 text-sm">
+                    <td class="p-3 text-gray-600 whitespace-nowrap">{{ mov.created_at|date:"M d, Y H:i" }}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-1 text-xs rounded font-bold {% if mov.is_stock_in %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                            {{ mov.movement_type }}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right font-bold font-mono text-lg 
+                        {% if mov.is_stock_in %}text-green-600{% else %}text-red-600{% endif %}">
+                        {% if mov.is_stock_in %}+{% else %}-{% endif %}{{ mov.quantity }}
+                    </td>
+                    <td class="p-3 text-gray-600 text-xs">{{ mov.reference|default:"-" }}</td>
+                    <td class="p-3 text-gray-600">{{ mov.created_by_name|default:"System" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="p-6 text-center text-gray-500">
+                        No movement history recorded for this lot.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        {% if count > 0 %}
+        <div class="p-4 flex justify-between items-center border-t bg-gray-50">
+            {% if prev_page %}
+            <a href="?page={{ prev_page }}" class="text-sm text-blue-600 hover:underline">&larr; Previous</a>
+            {% else %}
+            <span class="text-sm text-gray-400">&larr; Previous</span>
+            {% endif %}
+            
+            <span class="text-sm text-gray-600 font-bold">Page {{ current_page }}</span>
+            
+            {% if next_page %}
+            <a href="?page={{ next_page }}" class="text-sm text-blue-600 hover:underline">Next &rarr;</a>
+            {% else %}
+            <span class="text-sm text-gray-400">Next &rarr;</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% endblock %}

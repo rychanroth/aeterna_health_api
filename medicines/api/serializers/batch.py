@@ -8,8 +8,9 @@ class BatchSerializer(serializers.ModelSerializer):
     supplier_name = serializers.ReadOnlyField(source='supplier.name')
     is_expired = serializers.BooleanField(read_only=True)
     
-    product_id = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(), source='product', write_only=True
+    product_id = serializers.IntegerField(
+        allow_null=True, 
+        required=False
     )
     supplier_id = serializers.PrimaryKeyRelatedField(
         queryset=Supplier.objects.all(), source='supplier', write_only=True, allow_null=True, required=False

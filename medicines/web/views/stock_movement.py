@@ -82,15 +82,32 @@ def stock_movement_create(request):
     old_input = request.POST.dict() if request.method == 'POST' else {}
 
     if request.method == 'POST':
+        movement_type = old_input.get('movement_type')
+        
+        # Base payload for all movements
         payload = {
-            'product_id': old_input.get('product_id') or None,
-            'movement_type': old_input.get('movement_type'),
+            'movement_type': movement_type,
             'quantity': old_input.get('quantity'),
-            'unit_cost': old_input.get('unit_cost') or None,
-            'supplier_id': old_input.get('supplier_id') or None,
             'reference': old_input.get('reference', ''),
             'notes': old_input.get('notes', ''),
         }
+
+        # FIX: Dynamic payload based on movement reason
+        if movement_type == 'purchase':
+            # Auto-Create Batch Flow: Send product_id and batch details
+            payload.update({
+                'product_id': old_input.get('product_id') or None,
+                'supplier_id': old_input.get('supplier_id') or None,
+                'cost_price': old_input.get('cost_price') or None,
+                'expiration_date': old_input.get('expiration_date') or None,
+                'received_date': old_input.get('received_date') or None,
+            })
+        else:
+            # Stock Out Flow: Must target an existing batch
+            payload['batch_id'] = old_input.get('batch_id') or None
+            # Attach supplier if returning to supplier
+            if movement_type == 'return_supplier':
+                payload['supplier_id'] = old_input.get('supplier_id') or None
 
         response = api_call('POST', '/api/stock-movements/', data=payload, token=token)
         
@@ -106,7 +123,7 @@ def stock_movement_create(request):
         else:
             messages.error(request, f'Unexpected error (Status {response.status_code}).')
 
-    # Pass raw lists/dicts. The template will use |json_script
+    # Pass data for Alpine.js dropdowns and AJAX authentication
     products = fetch_all_api_data('/api/products/', token)
     suppliers = fetch_all_api_data('/api/suppliers/', token)
 
@@ -115,6 +132,7 @@ def stock_movement_create(request):
         'old_input': old_input,
         'products': products,
         'suppliers': suppliers,
+        'token': token, # Required for Alpine.js to fetch batches securely
     })
 
 

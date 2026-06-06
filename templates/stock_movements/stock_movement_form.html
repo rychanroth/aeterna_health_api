@@ -8,6 +8,7 @@
 {{ products|json_script:"products-data" }}
 {{ suppliers|json_script:"suppliers-data" }}
 {{ old_input|json_script:"old-input-data" }}
+{{ token|json_script:"api-token-data" }} <!-- Needed for secure batch fetching -->
 
 <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl border border-slate-200 shadow-sm" x-data="movementForm()">
     
@@ -29,7 +30,7 @@
         <i class='bx text-xl mt-0.5' :class="isStockIn ? 'bx-check-shield' : 'bx-error-circle'"></i>
         <div>
             <p class="font-bold">Immutable Record</p>
-            <p x-text="isStockIn ? 'You are adding stock to the inventory. Verify quantities and costs carefully before committing.' : 'You are removing stock from the inventory. This action is permanent and cannot be undone.'"></p>
+            <p x-text="isPurchase ? 'You are receiving new stock. A new inventory lot (Batch) will be auto-created.' : 'You are removing stock. This action is permanent and deducts from a specific Batch.'"></p>
         </div>
     </div>
 
@@ -42,7 +43,7 @@
                 <select name="movement_type" x-model="type" required
                         class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-900 font-medium focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all cursor-pointer">
                     <optgroup label="Stock In (Addition)">
-                        <option value="purchase">Purchase (Supplier)</option>
+                        <option value="purchase">Purchase (Receive New Stock)</option>
                         <option value="return_customer">Return from Customer</option>
                         <option value="adjustment_in">Adjustment (In)</option>
                     </optgroup>
@@ -57,39 +58,50 @@
                 {% if errors.movement_type %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.movement_type.0 }}</p>{% endif %}
             </div>
 
-            <div class="relative" @click.away="productOpen = false">
+            <!-- Target Product (Used for Purchase/Stock In) -->
+            <div class="relative" @click.away="productOpen = false" x-show="isPurchase">
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Target Product <span class="text-rose-500">*</span></label>
-                
-                <input type="hidden" name="product_id" :value="selectedProductId" required>
+                <input type="hidden" name="product_id" :value="selectedProductId" x-show="isPurchase">
                 
                 <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                        <i class='bx bx-search text-lg'></i>
-                    </div>
-                    <input type="text" x-model="searchProduct" @focus="productOpen = true" placeholder="Search by name or ID..."
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400"><i class='bx bx-search text-lg'></i></div>
+                    <input type="text" x-model="searchProduct" @focus="productOpen = true" placeholder="Search by name..."
                            class="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white text-gray-900 font-medium focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all placeholder-gray-400">
-                    
-                    <button type="button" x-show="selectedProductId" @click="clearProduct()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-rose-500 transition">
-                        <i class='bx bx-x-circle text-lg'></i>
-                    </button>
+                    <button type="button" x-show="selectedProductId" @click="clearProduct()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-rose-500 transition"><i class='bx bx-x-circle text-lg'></i></button>
                 </div>
 
                 <ul x-show="productOpen" x-transition class="absolute z-20 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
                     <template x-for="prod in filteredProducts" :key="prod.id">
-                        <li @click="selectProduct(prod)" 
-                            class="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group">
+                        <li @click="selectProduct(prod)" class="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group">
                             <div>
                                 <p class="text-sm font-bold text-gray-900 group-hover:text-slate-700" x-text="prod.name"></p>
-                                <p class="text-xs text-gray-400" x-text="'ID: ' + prod.id"></p>
                             </div>
+                            <!-- FIX: Use total_stock instead of stock_quantity -->
                             <span class="text-xs font-bold px-2 py-1 rounded-md"
-                                  :class="prod.stock_quantity > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'"
-                                  x-text="'Stock: ' + prod.stock_quantity"></span>
+                                  :class="prod.total_stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'"
+                                  x-text="'Stock: ' + (prod.total_stock || 0)"></span>
                         </li>
                     </template>
                     <li x-show="filteredProducts.length === 0" class="px-4 py-3 text-sm text-gray-500 text-center">No products found.</li>
                 </ul>
                 {% if errors.product_id %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.product_id.0 }}</p>{% endif %}
+            </div>
+
+            <!-- Target Batch (Used for Stock Out) -->
+            <div x-show="!isStockIn">
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Target Batch <span class="text-rose-500">*</span></label>
+                <input type="hidden" name="batch_id" :value="selectedBatchId">
+                
+                <div class="relative">
+                    <select x-model="selectedBatchId" :disabled="availableBatches.length === 0" required
+                            class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-900 font-medium focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        <option value="" disabled>Select Product First...</option>
+                        <template x-for="bat in availableBatches" :key="bat.id">
+                            <option :value="bat.id" x-text="`${bat.batch_number} (Qty: ${bat.quantity}, Exp: ${bat.expiration_date || 'N/A'})`"></option>
+                        </template>
+                    </select>
+                </div>
+                {% if errors.batch_id %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.batch_id.0 }}</p>{% endif %}
             </div>
         </div>
 
@@ -101,31 +113,43 @@
                 {% if errors.quantity %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.quantity.0 }}</p>{% endif %}
             </div>
 
-            <div x-show="isStockIn" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
-                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Unit Cost</label>
+            <!-- Unit Cost (Replaced from StockMovement to Batch/Purchase) -->
+            <div x-show="isPurchase" x-transition>
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Cost Price (per unit)</label>
                 <div class="relative">
                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                    <input type="number" step="0.01" name="unit_cost" x-model="unitCost" placeholder="0.00"
+                    <input type="number" step="0.01" name="cost_price" x-model="costPrice" placeholder="0.00"
                            class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 bg-gray-50 focus:bg-white text-gray-900 font-bold focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all">
                 </div>
-                {% if errors.unit_cost %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.unit_cost.0 }}</p>{% endif %}
+                {% if errors.cost_price %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.cost_price.0 }}</p>{% endif %}
             </div>
         </div>
 
-        <div x-show="isStockIn" class="relative" @click.away="supplierOpen = false" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+        <!-- Auto-Batch Creation Fields (Purchase Only) -->
+        <div x-show="isPurchase" class="grid grid-cols-1 md:grid-cols-2 gap-6" x-transition>
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Expiration Date</label>
+                <input type="date" name="expiration_date" x-model="expirationDate" 
+                       class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 focus:bg-white text-gray-900 font-medium focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all">
+                {% if errors.expiration_date %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.expiration_date.0 }}</p>{% endif %}
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Received Date</label>
+                <input type="date" name="received_date" x-model="receivedDate" 
+                       class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 focus:bg-white text-gray-900 font-medium focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all">
+            </div>
+        </div>
+
+        <!-- Supplier Logic -->
+        <div x-show="isPurchase || type === 'return_supplier'" class="relative" @click.away="supplierOpen = false" x-transition>
             <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Source Supplier</label>
             <input type="hidden" name="supplier_id" :value="selectedSupplierId">
             
             <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                    <i class='bx bx-buildings text-lg'></i>
-                </div>
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400"><i class='bx bx-buildings text-lg'></i></div>
                 <input type="text" x-model="searchSupplier" @focus="supplierOpen = true" placeholder="Search suppliers (Optional)..."
                        class="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white text-gray-900 font-medium focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all placeholder-gray-400">
-                
-                <button type="button" x-show="selectedSupplierId" @click="clearSupplier()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-rose-500 transition">
-                    <i class='bx bx-x-circle text-lg'></i>
-                </button>
+                <button type="button" x-show="selectedSupplierId" @click="clearSupplier()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-rose-500 transition"><i class='bx bx-x-circle text-lg'></i></button>
             </div>
 
             <ul x-show="supplierOpen" x-transition class="absolute z-20 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
@@ -157,7 +181,7 @@
                     class="px-8 py-3 rounded-xl text-sm font-bold text-white active:scale-[0.98] shadow-lg transition-all flex items-center gap-2"
                     :class="isStockIn ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'">
                 <i class='bx' :class="isStockIn ? 'bx-check-shield' : 'bx-minus-circle'"></i>
-                <span x-text="isStockIn ? 'Commit Stock In' : 'Commit Stock Out'"></span>
+                <span x-text="isPurchase ? 'Receive Stock & Create Batch' : 'Commit Stock Out'"></span>
             </button>
         </div>
     </form>
@@ -174,40 +198,41 @@
     function movementForm() {
         return {
             type: 'purchase',
-            
-            // Models for standard inputs (ensures old_input repopulation if implemented via init)
             quantity: '',
-            unitCost: '',
+            costPrice: '',
+            expirationDate: '',
+            receivedDate: '',
             reference: '',
             notes: '',
 
-            // Product State
+            // Product State (For Purchase)
             products: [],
             searchProduct: '',
             productOpen: false,
             selectedProductId: '',
             
+            // Batch State (For Stock Out)
+            availableBatches: [],
+            selectedBatchId: '',
+
             // Supplier State
             suppliers: [],
             searchSupplier: '',
             supplierOpen: false,
             selectedSupplierId: '',
+            token: '',
 
             init() {
-                // 1. Safely parse data injected by Django's json_script
-                const pEl = document.getElementById('products-data');
-                if (pEl) this.products = JSON.parse(pEl.textContent);
+                this.products = JSON.parse(document.getElementById('products-data')?.textContent || '[]');
+                this.suppliers = JSON.parse(document.getElementById('suppliers-data')?.textContent || '[]');
+                this.token = document.getElementById('api-token-data')?.textContent || '';
                 
-                const sEl = document.getElementById('suppliers-data');
-                if (sEl) this.suppliers = JSON.parse(sEl.textContent);
+                const oldInput = JSON.parse(document.getElementById('old-input-data')?.textContent || '{}');
 
-                const oldEl = document.getElementById('old-input-data');
-                const oldInput = oldEl ? JSON.parse(oldEl.textContent) : {};
-
-                // 2. Restore state if validation failed
                 if (oldInput.movement_type) this.type = oldInput.movement_type;
                 if (oldInput.quantity) this.quantity = oldInput.quantity;
-                if (oldInput.unit_cost) this.unitCost = oldInput.unit_cost;
+                if (oldInput.cost_price) this.costPrice = oldInput.cost_price;
+                if (oldInput.expiration_date) this.expirationDate = oldInput.expiration_date;
                 if (oldInput.reference) this.reference = oldInput.reference;
                 if (oldInput.notes) this.notes = oldInput.notes;
 
@@ -216,6 +241,11 @@
                     const prod = this.products.find(p => String(p.id) === String(oldInput.product_id));
                     if (prod) this.searchProduct = prod.name;
                 }
+                if (oldInput.batch_id) {
+                    this.selectedBatchId = oldInput.batch_id;
+                    // Need to load batches to show the dropdown properly on error repopulation
+                    this.loadBatches(); 
+                }
                 if (oldInput.supplier_id) {
                     this.selectedSupplierId = oldInput.supplier_id;
                     const sup = this.suppliers.find(s => String(s.id) === String(oldInput.supplier_id));
@@ -223,12 +253,13 @@
                 }
             },
 
-            // Computed
             get isStockIn() {
                 return ['purchase', 'return_customer', 'adjustment_in'].includes(this.type);
             },
+            get isPurchase() {
+                return this.type === 'purchase';
+            },
             
-            // Filtering
             get filteredProducts() {
                 if (this.searchProduct === '' || (this.selectedProductId && this.products.find(p => p.name === this.searchProduct))) {
                     return this.products;
@@ -244,15 +275,40 @@
                 return this.suppliers.filter(s => s.name.toLowerCase().includes(this.searchSupplier.toLowerCase()));
             },
 
-            // Actions
+            // NEW: Fetch active batches for the selected product (Stock Out flow)
+            async loadBatches() {
+                if (!this.selectedProductId || this.isStockIn) {
+                    this.availableBatches = [];
+                    return;
+                }
+                try {
+                    // Using the product ID to find the associated active batches
+                    const prod = this.products.find(p => String(p.id) === String(this.selectedProductId));
+                    const res = await fetch(`/api/batches/?product=${this.selectedProductId}&is_active=true&ordering=expiration_date`, {
+                        headers: { 'Authorization': `Token ${this.token}` }
+                    });
+                    const data = await res.json();
+                    this.availableBatches = data.results || data;
+                    if (this.availableBatches.length > 0 && !this.selectedBatchId) {
+                        // Pre-select first available batch
+                        this.selectedBatchId = this.availableBatches[0].id; 
+                    }
+                } catch (e) {
+                    this.availableBatches = [];
+                }
+            },
+
             selectProduct(prod) {
                 this.selectedProductId = prod.id;
                 this.searchProduct = prod.name;
                 this.productOpen = false;
+                this.loadBatches(); // Load batches for Stock Out flow
             },
             clearProduct() {
                 this.selectedProductId = '';
                 this.searchProduct = '';
+                this.availableBatches = [];
+                this.selectedBatchId = '';
                 setTimeout(() => this.productOpen = true, 50); 
             },
             

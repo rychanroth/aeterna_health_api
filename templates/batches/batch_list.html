@@ -73,7 +73,11 @@
             <!-- Gray out depleted lots for visual hierarchy -->
             <tr class="border-b hover:bg-gray-50 text-sm {% if not batch.is_active %}bg-gray-50 text-gray-400{% endif %}">
                 <td class="p-3 font-mono text-xs font-bold text-blue-700">{{ batch.batch_number }}</td>
-                <td class="p-3 font-semibold text-gray-800">{{ batch.product_name }}</td>
+                <td class="p-3 font-semibold text-gray-800">
+                    <a href="{% url 'template-batch-detail' batch.id %}" class="block group hover:text-green-700">
+                        {{ batch.product_name }}
+                    </a>
+                </td>
                 <td class="p-3 text-gray-600 text-xs">{{ batch.supplier_name|default:"-" }}</td>
                 <td class="p-3 text-right font-bold text-lg 
                     {% if batch.quantity <= 0 %}text-gray-400
