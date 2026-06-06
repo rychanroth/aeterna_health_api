@@ -55,6 +55,9 @@ urlpatterns = [
     path('stock-movements/create/', stock_movement_create, name='template-stock-movement-create'),
     path('stock-movements/<int:id>/', stock_movement_detail, name='template-stock-movement-detail'),
 
+    # BATCH
+    path('batches/', batch_list, name='template-batch-list'),
+
     # PRODUCT
     path('products/', product_list, name='template-product-list'),
     path('products/create/', product_create, name='template-product-create'),
