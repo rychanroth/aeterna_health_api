@@ -194,6 +194,8 @@
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
 
+<!-- ... (Keep all the HTML above the exact same as the last message) ... -->
+
 <script>
     function movementForm() {
         return {
@@ -205,13 +207,13 @@
             reference: '',
             notes: '',
 
-            // Product State (For Purchase)
+            // Product State
             products: [],
             searchProduct: '',
             productOpen: false,
             selectedProductId: '',
             
-            // Batch State (For Stock Out)
+            // Batch State
             availableBatches: [],
             selectedBatchId: '',
 
@@ -223,12 +225,20 @@
             token: '',
 
             init() {
+                // 1. Parse Data Safely
                 this.products = JSON.parse(document.getElementById('products-data')?.textContent || '[]');
                 this.suppliers = JSON.parse(document.getElementById('suppliers-data')?.textContent || '[]');
-                this.token = document.getElementById('api-token-data')?.textContent || '';
                 
+                // FIX: Use JSON.parse for the token to strip the double quotes added by Django's json_script
+                const tokenEl = document.getElementById('api-token-data');
+                if (tokenEl) {
+                    try { this.token = JSON.parse(tokenEl.textContent); } 
+                    catch(e) { this.token = ''; }
+                }
+
                 const oldInput = JSON.parse(document.getElementById('old-input-data')?.textContent || '{}');
 
+                // 2. Restore State
                 if (oldInput.movement_type) this.type = oldInput.movement_type;
                 if (oldInput.quantity) this.quantity = oldInput.quantity;
                 if (oldInput.cost_price) this.costPrice = oldInput.cost_price;
@@ -243,7 +253,6 @@
                 }
                 if (oldInput.batch_id) {
                     this.selectedBatchId = oldInput.batch_id;
-                    // Need to load batches to show the dropdown properly on error repopulation
                     this.loadBatches(); 
                 }
                 if (oldInput.supplier_id) {
@@ -275,26 +284,38 @@
                 return this.suppliers.filter(s => s.name.toLowerCase().includes(this.searchSupplier.toLowerCase()));
             },
 
-            // NEW: Fetch active batches for the selected product (Stock Out flow)
+            // FIX: Robust Batch Fetching
             async loadBatches() {
-                if (!this.selectedProductId || this.isStockIn) {
+                if (!this.selectedProductId || this.isPurchase) {
                     this.availableBatches = [];
+                    this.selectedBatchId = '';
                     return;
                 }
                 try {
-                    // Using the product ID to find the associated active batches
-                    const prod = this.products.find(p => String(p.id) === String(this.selectedProductId));
                     const res = await fetch(`/api/batches/?product=${this.selectedProductId}&is_active=true&ordering=expiration_date`, {
                         headers: { 'Authorization': `Token ${this.token}` }
                     });
+                    
+                    if (!res.ok) throw new Error(`API returned ${res.status}`);
+                    
                     const data = await res.json();
+                    // Handle paginated or flat list responses safely
                     this.availableBatches = data.results || data;
-                    if (this.availableBatches.length > 0 && !this.selectedBatchId) {
-                        // Pre-select first available batch
-                        this.selectedBatchId = this.availableBatches[0].id; 
+                    
+                    // If the previously selected batch isn't in the new list, reset selection
+                    if (this.availableBatches.length > 0) {
+                        const exists = this.availableBatches.find(b => String(b.id) === String(this.selectedBatchId));
+                        if (!exists) {
+                            this.selectedBatchId = this.availableBatches[0].id; // Default to first
+                        }
+                    } else {
+                        this.selectedBatchId = ''; // No batches available
                     }
                 } catch (e) {
+                    // Catch network errors or 401s and safely clear the list
+                    console.error("Batch load failed:", e);
                     this.availableBatches = [];
+                    this.selectedBatchId = '';
                 }
             },
 
@@ -302,7 +323,8 @@
                 this.selectedProductId = prod.id;
                 this.searchProduct = prod.name;
                 this.productOpen = false;
-                this.loadBatches(); // Load batches for Stock Out flow
+                this.selectedBatchId = ''; // Reset batch selection
+                this.loadBatches();
             },
             clearProduct() {
                 this.selectedProductId = '';
