@@ -43,7 +43,6 @@ class Product(UpdatableAbstractModel):
     product_type = models.ForeignKey('ProductType', on_delete=models.RESTRICT, null=True, blank=True, related_name='products')
     base_unit = models.CharField(max_length=20, choices=BaseUnit.choices, default=BaseUnit.TABLET)
     category = models.ForeignKey('Category', on_delete=models.RESTRICT, null=True, blank=True, related_name='products')
-    suppliers = models.ManyToManyField('Supplier', blank=True, related_name='products')
     description = models.TextField(blank=True)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     requires_prescription = models.BooleanField(default=False)

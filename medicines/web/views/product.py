@@ -59,7 +59,7 @@ def product_create(request):
             'product_type_id': old_input.get('product_type_id') or None,
             'requires_prescription': old_input['requires_prescription'],
             'is_active': old_input['is_active'],
-            'supplier_ids': [int(sid) for sid in request.POST.getlist('supplier_ids') if sid],
+            # FIX: Removed supplier_ids
         }
 
         files = {'image': request.FILES['image']} if 'image' in request.FILES else None
@@ -73,16 +73,12 @@ def product_create(request):
         else:
             messages.error(request, 'Failed to create product.')
 
-        # Preserve supplier IDs as strings for template repopulation on error
-        old_input['supplier_ids'] = [str(sid) for sid in payload['supplier_ids']]
-
     categories = fetch_all_api_data('/api/categories/', token)
     product_types = fetch_all_api_data('/api/product-types/', token)
-    suppliers = fetch_all_api_data('/api/suppliers/', token)
 
     return render(request, 'products/product_form.html', {
         'edit_mode': False, 'errors': errors, 'product': old_input,
-        'categories': categories, 'product_types': product_types, 'suppliers': suppliers,
+        'categories': categories, 'product_types': product_types,
         'base_units': Product.BaseUnit.choices,
     })
 
@@ -117,12 +113,6 @@ def product_edit(request, id):
         return redirect('template-product-list')
     product_data = response.json()
 
-    # Normalize M2M for template: Convert nested API objects to a flat list of string IDs
-    if product_data.get('suppliers') and isinstance(product_data['suppliers'], list):
-        product_data['supplier_ids'] = [str(s['id']) for s in product_data['suppliers']]
-    else:
-        product_data['supplier_ids'] = []
-
     if request.method == 'POST':
         old_input = request.POST.dict()
         old_input['is_active'] = request.POST.get('is_active') == 'on'
@@ -138,7 +128,7 @@ def product_edit(request, id):
             'product_type_id': old_input.get('product_type_id') or None,
             'requires_prescription': old_input['requires_prescription'],
             'is_active': old_input['is_active'],
-            'supplier_ids': [int(sid) for sid in request.POST.getlist('supplier_ids') if sid],
+            # FIX: Removed supplier_ids
         }
 
         files = {'image': request.FILES['image']} if 'image' in request.FILES else None
@@ -150,17 +140,15 @@ def product_edit(request, id):
         elif response.status_code == 400:
             errors = response.json()
             product_data.update(old_input)
-            product_data['supplier_ids'] = [str(sid) for sid in payload['supplier_ids']]
         else:
             messages.error(request, 'Failed to update product.')
 
     categories = fetch_all_api_data('/api/categories/', token)
     product_types = fetch_all_api_data('/api/product-types/', token)
-    suppliers = fetch_all_api_data('/api/suppliers/', token)
 
     return render(request, 'products/product_form.html', {
         'edit_mode': True, 'errors': errors, 'product': product_data,
-        'categories': categories, 'product_types': product_types, 'suppliers': suppliers,
+        'categories': categories, 'product_types': product_types,
         'base_units': Product.BaseUnit.choices,
     })
 

@@ -184,7 +184,6 @@ class Command(BaseCommand):
                 'requires_prescription': requires_rx,
             }
         )
-        product.suppliers.add(supplier)
 
         # FIX: Create a Batch to hold the stock
         cost_price = price * Decimal('0.6')  # Simulate 60% margin

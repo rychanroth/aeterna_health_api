@@ -20,8 +20,8 @@ class ProductViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
 
     def get_queryset(self):
-        # Annotate so the serializer and filterset can use DB-level logic
-        return Product.objects.annotate(
+        # FIX: Use select_related for FKs to prevent N+1 queries during pagination
+        return Product.objects.select_related('category', 'product_type').annotate(
             total_stock=Coalesce(Sum('batches__quantity', filter=Q(batches__is_active=True)), Value(0, output_field=IntegerField())),
             nearest_expiration=Min('batches__expiration_date', filter=Q(batches__is_active=True))
         )

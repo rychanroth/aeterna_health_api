@@ -63,7 +63,6 @@ def create_product_with_stock(name, stock_quantity=100, created_by=None, **kwarg
         selling_price=selling_price,
         requires_prescription=requires_prescription
     )
-    product.suppliers.add(supplier)
 
     # FIX: Create a Batch to hold the stock and expiration
     batch = Batch.objects.create(
