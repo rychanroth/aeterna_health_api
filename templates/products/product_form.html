@@ -1,103 +1,274 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ edit_mode|yesno:"Update,Create" }} Product{% endblock %}
-{% block page_title %}{{ edit_mode|yesno:"Update,Create" }} Product{% endblock %}
+{% block title %}{% if edit_mode %}Edit{% else %}Create{% endif %} Product{% endblock %}
+{% block page_title %}{% if edit_mode %}Edit{% else %}Create{% endif %} Product{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <a href="{% url 'template-product-list' %}" class="text-sm text-green-600 hover:underline">&larr; Back to Products</a>
-</div>
 
-<div class="bg-white p-6 rounded shadow max-w-4xl">
-    <form method="POST" enctype="multipart/form-data" class="space-y-6">
+<div class="max-w-6xl mx-auto px-4 py-6" x-data="productFormApp()">
+
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-2">
+            <a href="{% url 'template-product-list' %}" class="text-gray-400 hover:text-gray-600 transition p-1.5 rounded-lg hover:bg-gray-100">
+                <i class='bx bx-arrow-back text-xl'></i>
+            </a>
+            <div>
+                <span class="text-xs font-semibold text-teal-600 tracking-wider uppercase">Inventory Management</span>
+                <h1 class="text-2xl font-bold text-gray-900">{% if edit_mode %}Modify Existing{% else %}Register New{% endif %} Product</h1>
+            </div>
+        </div>
+    </div>
+
+    {% if errors.non_field_errors %}
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg shadow-sm">
+            {% for error in errors.non_field_errors %}
+                <p class="text-sm font-medium text-red-700">{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {% csrf_token %}
-        
-        {% if errors.non_field_errors %}
-            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                {% for error in errors.non_field_errors %}<p class="text-sm text-red-700">{{ error }}</p>{% endfor %}
-            </div>
-        {% endif %}
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Left Column -->
-            <div class="space-y-4">
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-700">Product Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="name" id="name" value="{{ product.name }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                    {% if errors.name %}<p class="text-red-500 text-xs mt-1">{{ errors.name.0 }}</p>{% endif %}
+        <div class="lg:col-span-2 space-y-6">
+
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div class="border-b border-gray-100 pb-3 flex items-center gap-2 text-gray-700">
+                    <i class='bx bx-id-card text-lg text-teal-500'></i>
+                    <h3 class="font-bold text-sm uppercase tracking-wider">Product Catalog Properties</h3>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Product Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="name" value="{{ product.name }}" required
+                               placeholder="e.g., Amoxicillin 500mg"
+                               class="w-full border border-gray-300 rounded-lg px-3.5 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition {% if errors.name %}border-red-500{% endif %}">
+                        {% if errors.name %}<p class="text-red-500 text-xs mt-1 font-medium">{{ errors.name.0 }}</p>{% endif %}
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Base Dispensing Unit <span class="text-red-500">*</span></label>
+                        <select name="base_unit" required
+                                class="w-full border border-gray-300 rounded-lg px-3.5 py-2 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition {% if errors.base_unit %}border-red-500{% endif %}">
+                            <template x-for="unit in baseUnits" :key="unit.value">
+                                <option :value="unit.value" :selected="unit.value === currentBaseUnit" x-text="unit.label"></option>
+                            </template>
+                        </select>
+                        {% if errors.base_unit %}<p class="text-red-500 text-xs mt-1 font-medium">{{ errors.base_unit.0 }}</p>{% endif %}
+                    </div>
                 </div>
 
                 <div>
-                    <label for="product_type_id" class="block text-sm font-medium text-gray-700">Product Type</label>
-                    <select name="product_type_id" id="product_type_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                        <option value="">---------</option>
-                        {% for pt in product_types %}
-                        <option value="{{ pt.id }}" {% if product.product_type_id|stringformat:"s" == pt.id|stringformat:"s" %}selected{% endif %}>{{ pt.name }}</option>
-                        {% endfor %}
-                    </select>
-                    {% if errors.product_type_id %}<p class="text-red-500 text-xs mt-1">{{ errors.product_type_id.0 }}</p>{% endif %}
-                </div>
-
-                <div>
-                    <label for="category_id" class="block text-sm font-medium text-gray-700">Category</label>
-                    <select name="category_id" id="category_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                        <option value="">---------</option>
-                        {% for cat in categories %}
-                        <option value="{{ cat.id }}" {% if product.category_id|stringformat:"s" == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.full_path|default:cat.name }}</option>
-                        {% endfor %}
-                    </select>
-                    {% if errors.category_id %}<p class="text-red-500 text-xs mt-1">{{ errors.category_id.0 }}</p>{% endif %}
-                </div>
-
-                <div>
-                    <label for="base_unit" class="block text-sm font-medium text-gray-700">Base Unit <span class="text-red-500">*</span></label>
-                    <select name="base_unit" id="base_unit" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                        {% for value, label in base_units %}
-                        <option value="{{ value }}" {% if product.base_unit == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                    {% if errors.base_unit %}<p class="text-red-500 text-xs mt-1">{{ errors.base_unit.0 }}</p>{% endif %}
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Description / Therapeutic Indications</label>
+                    <textarea name="description" rows="3" placeholder="Provide clear package details, composition, or handling guidelines..."
+                              class="w-full border border-gray-300 rounded-lg px-3.5 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition {% if errors.description %}border-red-500{% endif %}">{{ product.description }}</textarea>
+                    {% if errors.description %}<p class="text-red-500 text-xs mt-1 font-medium">{{ errors.description.0 }}</p>{% endif %}
                 </div>
             </div>
 
-            <!-- Right Column -->
-            <div class="space-y-4">
-                <div>
-                    <label for="selling_price" class="block text-sm font-medium text-gray-700">Selling Price ($) <span class="text-red-500">*</span></label>
-                    <input type="number" name="selling_price" id="selling_price" step="0.01" value="{{ product.selling_price }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                    {% if errors.selling_price %}<p class="text-red-500 text-xs mt-1">{{ errors.selling_price.0 }}</p>{% endif %}
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div class="border-b border-gray-100 pb-3 flex items-center gap-2 text-gray-700">
+                    <i class='bx bx-category text-lg text-teal-500'></i>
+                    <h3 class="font-bold text-sm uppercase tracking-wider">System Classification Matrix</h3>
                 </div>
 
-                <div>
-                    <label for="image" class="block text-sm font-medium text-gray-700">Product Image</label>
-                    <input type="file" name="image" id="image" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
-                    {% if edit_mode and product.image %}<p class="text-xs text-gray-500 mt-1">Current: <a href="{{ product.image }}" target="_blank" class="text-blue-500 underline">View</a></p>{% endif %}
-                    {% if errors.image %}<p class="text-red-500 text-xs mt-1">{{ errors.image.0 }}</p>{% endif %}
-                </div>
-
-                <div>
-                    <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
-                    <textarea name="description" id="description" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">{{ product.description }}</textarea>
-                    {% if errors.description %}<p class="text-red-500 text-xs mt-1">{{ errors.description.0 }}</p>{% endif %}
-                </div>
-
-                <div class="flex items-center gap-6 pt-2">
-                    <div class="flex items-center">
-                        <input type="checkbox" name="requires_prescription" id="requires_prescription" {% if product.requires_prescription %}checked{% endif %} class="h-4 w-4 text-green-600 border-gray-300 rounded">
-                        <label for="requires_prescription" class="ml-2 block text-sm text-gray-900">Requires Prescription</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Product Type</label>
+                        <select name="product_type_id"
+                                x-model="selectedProductType"
+                                @change="handleProductTypeChange()"
+                                class="w-full border border-gray-300 rounded-lg px-3.5 py-2 bg-white text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition {% if errors.product_type_id %}border-red-500{% endif %}">
+                            <option value="">-- Choose Type --</option>
+                            {% for pt in product_types %}
+                                <option value="{{ pt.id }}" {% if product.product_type_id|stringformat:"s" == pt.id|stringformat:"s" or product.product_type.id == pt.id %}selected{% endif %}>{{ pt.name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if errors.product_type_id %}<p class="text-red-500 text-xs mt-1 font-medium">{{ errors.product_type_id.0 }}</p>{% endif %}
                     </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" name="is_active" id="is_active" {% if product.is_active %}checked{% elif not edit_mode %}checked{% endif %} class="h-4 w-4 text-green-600 border-gray-300 rounded">
-                        <label for="is_active" class="ml-2 block text-sm text-gray-900">Active</label>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Assigned Category Hierarchy</label>
+                        <select name="category_id"
+                                x-model="selectedCategory"
+                                :disabled="!selectedProductType"
+                                :class="!selectedProductType ? 'bg-gray-50 cursor-not-allowed opacity-70' : 'bg-white'"
+                                class="w-full border border-gray-300 rounded-lg px-3.5 py-2 text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition {% if errors.category_id %}border-red-500{% endif %}">
+
+                            <template x-if="!selectedProductType">
+                                <option value="">Select a Product Type first...</option>
+                            </template>
+
+                            <template x-if="selectedProductType">
+                                <option value="">-- Choose Categorization --</option>
+                            </template>
+
+                            <template x-if="selectedProductType" x-for="cat in filteredCategories" :key="cat.id">
+                                <option :value="cat.id" :selected="cat.id == selectedCategory" x-text="cat.full_path || cat.name"></option>
+                            </template>
+                        </select>
+                        {% if errors.category_id %}<p class="text-red-500 text-xs mt-1 font-medium">{{ errors.category_id.0 }}</p>{% endif %}
                     </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div class="border-b border-gray-100 pb-3 flex items-center gap-2 text-gray-700">
+                    <i class='bx bx-dollar-circle text-lg text-teal-500'></i>
+                    <h3 class="font-bold text-sm uppercase tracking-wider">Metrics & Financials</h3>
+                </div>
+
+                <div class="md:w-1/2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Selling Price ($) <span class="text-red-500">*</span></label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                        <input type="number" step="0.01" name="selling_price" value="{{ product.selling_price }}" required placeholder="0.00"
+                               class="w-full border border-gray-300 rounded-lg pl-8 pr-3.5 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition {% if errors.selling_price %}border-red-500{% endif %}">
+                    </div>
+                    {% if errors.selling_price %}<p class="text-red-500 text-xs mt-1 font-medium">{{ errors.selling_price.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        <div class="space-y-6">
+
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div class="border-b border-gray-100 pb-3 flex items-center gap-2 text-gray-700">
+                    <i class='bx bx-image text-lg text-teal-500'></i>
+                    <h3 class="font-bold text-sm uppercase tracking-wider">Product Imagery</h3>
+                </div>
+
+                <div class="w-full aspect-video bg-gray-50 border border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center p-3 overflow-hidden relative group shadow-inner">
+                    <template x-if="imagePreview">
+                        <img :src="imagePreview" class="w-full h-full object-contain" alt="Image Canvas Preview">
+                    </template>
+                    <template x-if="!imagePreview">
+                        <div class="text-center text-gray-400">
+                            <i class='bx bx-cloud-upload text-4xl mb-1'></i>
+                            <p class="text-xs font-medium">No active asset thumbnail linked</p>
+                        </div>
+                    </template>
+                </div>
+
+                <div>
+                    <input type="file" name="image" accept="image/*" @change="handleImagePreviewUpdate"
+                           class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 border border-gray-200 rounded-lg p-1.5 cursor-pointer">
+                    
+                    {% if edit_mode and product.image %}
+                        <p class="text-xs text-gray-500 mt-2">Current Asset: <a href="{{ product.image }}" target="_blank" class="text-teal-600 hover:text-teal-800 underline transition font-medium">View File</a></p>
+                    {% endif %}
+                    
+                    {% if errors.image %}<p class="text-red-500 text-xs mt-1 font-medium">{{ errors.image.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div class="border-b border-gray-100 pb-3 flex items-center gap-2 text-gray-700">
+                    <i class='bx bx-shield-quarter text-lg text-teal-500'></i>
+                    <h3 class="font-bold text-sm uppercase tracking-wider">Compliance & Visibility</h3>
+                </div>
+
+                <div class="space-y-3">
+                    <label class="flex items-start gap-3 p-3 border border-purple-100 bg-purple-50/40 rounded-xl cursor-pointer hover:bg-purple-50 transition select-none">
+                        <input type="checkbox" name="requires_prescription" value="True"
+                               {% if product.requires_prescription %}checked{% endif %}
+                               class="mt-0.5 h-4 w-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500/30">
+                        <div>
+                            <span class="block text-xs font-bold text-purple-950 uppercase tracking-wider">Requires Prescription (Rx)</span>
+                            <span class="block text-[11px] text-purple-700 mt-0.5 leading-normal">Forces mandatory validation checks at POS before this item can be sold.</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 p-3 border border-teal-100 bg-teal-50/30 rounded-xl cursor-pointer hover:bg-teal-50/60 transition select-none">
+                        <input type="checkbox" name="is_active" value="True"
+                               {% if product.is_active or not edit_mode %}checked{% endif %}
+                               class="mt-0.5 h-4 w-4 text-teal-600 border-teal-300 rounded focus:ring-teal-500/30">
+                        <div>
+                            <span class="block text-xs font-bold text-teal-950 uppercase tracking-wider">Active Inventory Status</span>
+                            <span class="block text-[11px] text-teal-700 mt-0.5 leading-normal">Allows the product to be queried, sold, and tracked across workflows.</span>
+                        </div>
+                    </label>
                 </div>
             </div>
         </div>
 
-        <div class="flex justify-end pt-4 border-t">
-            <a href="{% url 'template-product-list' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow text-sm mr-2">Cancel</a>
-            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded shadow text-sm">{{ edit_mode|yesno:"Update,Create" }} Product</button>
+        <div class="col-span-1 lg:col-span-3 border-t border-gray-200 pt-5 flex items-center justify-end gap-3">
+            <a href="{% url 'template-product-list' %}"
+               class="px-5 py-2 rounded-xl text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Cancel</a>
+            <button type="submit"
+                    class="px-6 py-2 rounded-xl text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:scale-[0.99] shadow-md shadow-teal-600/10 transition">
+                {% if edit_mode %}Update Details{% else %}Save New Entry{% endif %}
+            </button>
         </div>
     </form>
 </div>
+
+<script>
+    function productFormApp() {
+        return {
+            // Configuration Context Framework
+            currentBaseUnit: "{{ product.base_unit|default:'' }}",
+
+            // Safely evaluate fallbacks using firstof to prevent engine lookup crashes
+            selectedProductType: "{% firstof product.product_type_id product.product_type.id '' %}",
+            selectedCategory: "{% firstof product.category_id product.category.id '' %}",
+
+            imagePreview: "{% if edit_mode and product.image %}{{ product.image }}{% endif %}",
+
+            // Dynamically populated from Django Model Choices
+            baseUnits: [
+                {% for value, label in base_units %}
+                {
+                    value: "{{ value|escapejs }}",
+                    label: "{{ label|escapejs }}"
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+
+            // Raw structural model data parsing
+            categories: [
+                {% for c in categories %}
+                {
+                    id: "{{ c.id }}",
+                    name: "{{ c.name|escapejs }}",
+                    full_path: "{{ c.full_path|default:c.name|escapejs }}",
+                    product_type_id: "{{ c.product_type.id }}"
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+
+            filteredCategories: [],
+
+            init() {
+                // Initial load mapping parameters
+                this.filterCategoriesByType();
+            },
+
+            handleProductTypeChange() {
+                this.filterCategoriesByType();
+                // Safe clear safeguard to prevent mismatching properties
+                this.selectedCategory = '';
+            },
+
+            filterCategoriesByType() {
+                if (!this.selectedProductType) {
+                    this.filteredCategories = [];
+                    return;
+                }
+                this.filteredCategories = this.categories.filter(cat =>
+                    String(cat.product_type_id) === String(this.selectedProductType)
+                );
+            },
+
+            handleImagePreviewUpdate(event) {
+                const element = event.target;
+                if (element.files && element.files[0]) {
+                    this.imagePreview = URL.createObjectURL(element.files[0]);
+                }
+            }
+        };
+    }
+</script>
 {% endblock %}
