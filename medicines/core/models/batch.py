@@ -53,11 +53,16 @@ class Batch(UpdatableAbstractModel):
     def save(self, *args, **kwargs):
         self.clean()
         
-        # FIX: Auto-inactivate if stock drops to 0
-        if self.quantity == 0 and self.is_active:
+        # Auto-inactivate if stock drops to 0
+        if self.quantity <= 0 and self.is_active:
             self.is_active = False
-            # If update_fields was explicitly passed, we must add 'is_active' 
-            # so the ORM actually saves the change to the database.
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None and 'is_active' not in update_fields:
+                kwargs['update_fields'] = list(update_fields) + ['is_active']
+                
+        # FIX: Auto-reactivate if stock becomes > 0 (e.g., initial stock add, or return to depleted batch)
+        elif self.quantity > 0 and not self.is_active:
+            self.is_active = True
             update_fields = kwargs.get('update_fields')
             if update_fields is not None and 'is_active' not in update_fields:
                 kwargs['update_fields'] = list(update_fields) + ['is_active']

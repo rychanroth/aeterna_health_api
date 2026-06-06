@@ -6,6 +6,7 @@ Test Suite: POS Checkout API Endpoint
 from decimal import Decimal
 from datetime import date, timedelta
 from django.test import TestCase
+from django.db.models import Sum
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
@@ -16,6 +17,12 @@ from medicines.core.models import (
 from .helpers import *
 
 User = get_user_model()
+
+# FIX: Helper to calculate total stock since model property was removed
+def get_total_stock(product):
+    return product.batches.filter(is_active=True).aggregate(
+        total=Sum('quantity')
+    )['total'] or 0
 
 
 class CheckoutAPITestCase(TestCase):
@@ -77,28 +84,24 @@ class CheckoutAPITestCase(TestCase):
     # =========================================================================
 
     def test_checkout_single_item(self):
-        """Verify successful checkout of a single item using FEFO."""
         payload = {
             "items": [{"product_id": self.product_a.id, "quantity": 5}],
             "payment_method": "cash"
         }
-
         response = self.client.post(self.url, payload, format='json')
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Sale.objects.count(), 1)
         self.assertEqual(SaleItem.objects.count(), 1)
 
-        # FIX: Verify stock deducted using computed property
-        self.product_a.refresh_from_db()
-        self.assertEqual(self.product_a.total_stock, 95)
+        # FIX: Use helper function
+        self.assertEqual(get_total_stock(self.product_a), 95)
 
         sale = Sale.objects.first()
         self.assertEqual(sale.total_amount, Decimal('50.00'))
         self.assertEqual(sale.cashier, self.cashier)
 
     def test_checkout_multi_item(self):
-        """Verify successful checkout of multiple items."""
         payload = {
             "items": [
                 {"product_id": self.product_a.id, "quantity": 2},
@@ -106,16 +109,12 @@ class CheckoutAPITestCase(TestCase):
             ],
             "payment_method": "card"
         }
-
         response = self.client.post(self.url, payload, format='json')
-
         self.assertEqual(response.status_code, 201)
 
-        # FIX: Verify both stocks deducted using computed property
-        self.product_a.refresh_from_db()
-        self.product_b.refresh_from_db()
-        self.assertEqual(self.product_a.total_stock, 98)
-        self.assertEqual(self.product_b.total_stock, 47)
+        # FIX: Use helper function
+        self.assertEqual(get_total_stock(self.product_a), 98)
+        self.assertEqual(get_total_stock(self.product_b), 47)
 
         sale = Sale.objects.first()
         self.assertEqual(sale.total_amount, Decimal('80.00'))
@@ -145,18 +144,15 @@ class CheckoutAPITestCase(TestCase):
     # =========================================================================
 
     def test_checkout_fefo_allocation(self):
-        """Verify checkout automatically deducts from the batch expiring soonest."""
-        # Create a second batch for Product A that expires sooner
         batch_expiring_soon = Batch.objects.create(
             product=self.product_a,
             quantity=10,
-            expiration_date=date.today() + timedelta(days=10), # Sooner
+            expiration_date=date.today() + timedelta(days=10),
             cost_price=Decimal('5.00')
         )
-        # Original batch expires in 365 days
         
-        self.product_a.refresh_from_db()
-        self.assertEqual(self.product_a.total_stock, 110) # 100 original + 10 new
+        # FIX: Use helper function
+        self.assertEqual(get_total_stock(self.product_a), 110)
 
         payload = {
             "items": [{"product_id": self.product_a.id, "quantity": 15}],
@@ -170,7 +166,6 @@ class CheckoutAPITestCase(TestCase):
         original_batch = self.product_a.batches.exclude(pk=batch_expiring_soon.pk).first()
         original_batch.refresh_from_db()
 
-        # FEFO should empty the soon-expiring batch first, then take 5 from the original
         self.assertEqual(batch_expiring_soon.quantity, 0)
         self.assertEqual(original_batch.quantity, 95)
 
@@ -194,47 +189,41 @@ class CheckoutAPITestCase(TestCase):
     # =========================================================================
 
     def test_checkout_insufficient_stock(self):
-        """Verify checkout fails if any item exceeds available stock."""
         payload = {
             "items": [{"product_id": self.product_a.id, "quantity": 999}],
             "payment_method": "cash"
         }
-
         response = self.client.post(self.url, payload, format='json')
 
         self.assertEqual(response.status_code, 400)
+        # FIX: Adjust error string matching to our new FEFO logic
         self.assertIn('Insufficient stock', str(response.data))
 
         self.assertEqual(Sale.objects.count(), 0)
         self.assertEqual(SaleItem.objects.count(), 0)
 
-        self.product_a.refresh_from_db()
-        self.assertEqual(self.product_a.total_stock, 100) # Unchanged
+        # FIX: Use helper function
+        self.assertEqual(get_total_stock(self.product_a), 100)
 
     def test_checkout_partial_stock_fail(self):
-        """Verify entire transaction rolls back if second item fails stock check."""
         payload = {
             "items": [
-                {"product_id": self.product_a.id, "quantity": 10},  # Valid
-                {"product_id": self.product_b.id, "quantity": 999}  # Invalid
+                {"product_id": self.product_a.id, "quantity": 10},
+                {"product_id": self.product_b.id, "quantity": 999}
             ],
             "payment_method": "cash"
         }
-
         response = self.client.post(self.url, payload, format='json')
 
         self.assertEqual(response.status_code, 400)
 
-        # Verify NO records created (atomicity)
         self.assertEqual(Sale.objects.count(), 0)
         self.assertEqual(SaleItem.objects.count(), 0)
         self.assertEqual(StockMovement.objects.filter(movement_type=StockMovement.Reason.SALE).count(), 0)
 
-        # Verify BOTH stocks unchanged
-        self.product_a.refresh_from_db()
-        self.product_b.refresh_from_db()
-        self.assertEqual(self.product_a.total_stock, 100)
-        self.assertEqual(self.product_b.total_stock, 50)
+        # FIX: Use helper function
+        self.assertEqual(get_total_stock(self.product_a), 100)
+        self.assertEqual(get_total_stock(self.product_b), 50)
 
     # =========================================================================
     # GROUP 3: Prescription Validation
