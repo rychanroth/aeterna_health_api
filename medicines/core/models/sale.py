@@ -71,7 +71,7 @@ class SaleItem(CoreAbstractModel):
 
     def save(self, *args, **kwargs):
         if self.pk is not None:
-            raise ValidationError("SaleItem cannot be updated.")
+            raise ValidationError("Sale items cannot be updated as they are immutable audit records.")
 
         self.subtotal = Decimal(self.quantity) * Decimal(self.unit_price)
         
@@ -101,4 +101,4 @@ class SaleItem(CoreAbstractModel):
             Sale.objects.filter(pk=self.sale.pk).update(total_amount=self.sale.total_amount)
 
     def delete(self, *args, **kwargs):
-        raise ValidationError("Sale items cannot be deleted.")
+        raise ValidationError("Sale items cannot be deleted as they are immutable audit records.")
