@@ -16,7 +16,7 @@
 
     <form method="POST" class="space-y-6">
         {% csrf_token %}
-        
+
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method <span class="text-red-500">*</span></label>
             <select name="payment_method" class="w-full border border-gray-300 rounded px-3 py-2 bg-white">
@@ -27,7 +27,9 @@
         </div>
 
         <div class="border rounded shadow-sm p-4 bg-gray-50">
-            <h3 class="font-bold text-gray-800 mb-4">Prescribed Items</h3>
+            <h3 class="font-bold text-gray-800 mb-2">Prescribed Items</h3>
+            <p class="text-xs text-gray-500 mb-4"><i class='bx bx-info-circle'></i> Stock will be automatically allocated via FEFO (First-Expired, First-Out) logic.</p>
+            
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-gray-100 text-gray-600 text-sm">
@@ -35,35 +37,23 @@
                         <th class="p-2">Dosage</th>
                         <th class="p-2 text-right">Qty</th>
                         <th class="p-2 text-right">Unit Price</th>
-                        <th class="p-2 text-right">Subtotal</th>
+                        <th class="p-2 text-right">Est. Subtotal</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- Now we just loop through the enriched items -->
                     {% for item in prescription.items %}
                     <tr class="border-b text-sm">
-                        <td class="p-2 font-medium text-gray-800">
-                            {{ item.product_name }}
-                            <input type="hidden" name="product_id[]" value="{{ item.product }}">
-                        </td>
+                        <td class="p-2 font-medium text-gray-800">{{ item.product_name }}</td>
                         <td class="p-2 text-gray-600 text-xs">{{ item.dosage_instructions|default:"-" }}</td>
-                        <td class="p-2 text-gray-800 text-right">
-                            {{ item.quantity_prescribed }}
-                            <input type="hidden" name="quantity[]" value="{{ item.quantity_prescribed }}">
-                        </td>
-                        <td class="p-2 text-gray-800 text-right">
-                            $ {{ item.unit_price|floatformat:2 }}
-                            <input type="hidden" name="unit_price[]" value="{{ item.unit_price }}">
-                        </td>
-                        <td class="p-2 text-gray-800 text-right font-bold">
-                            $ {{ item.subtotal|floatformat:2 }}
-                        </td>
+                        <td class="p-2 text-gray-800 text-right">{{ item.quantity_prescribed }}</td>
+                        <td class="p-2 text-gray-800 text-right">$ {{ item.unit_price|floatformat:2 }}</td>
+                        <td class="p-2 text-gray-800 text-right font-bold">$ {{ item.subtotal|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot>
                     <tr class="border-t-2 border-gray-800 text-sm">
-                        <td colspan="4" class="p-2 text-right font-bold text-gray-900">Grand Total:</td>
+                        <td colspan="4" class="p-2 text-right font-bold text-gray-900">Estimated Total:</td>
                         <td class="p-2 text-right font-bold text-green-700 text-lg">
                             $ {{ prescription.calculated_total|floatformat:2 }}
                         </td>
@@ -75,7 +65,7 @@
         <div class="flex justify-end pt-4">
             <a href="{% url 'template-prescription-list' %}" class="bg-gray-300 text-gray-700 px-4 py-2 rounded mr-2 hover:bg-gray-400">Cancel</a>
             <button type="submit" class="bg-purple-600 text-white px-8 py-3 rounded hover:bg-purple-700 shadow font-bold text-lg flex items-center gap-2">
-                <i class='bx bx-check-shield'></i> Dispense & Complete Sale
+                <i class='bx bx-check-shield'></i> Dispense (FEFO)
             </button>
         </div>
     </form>

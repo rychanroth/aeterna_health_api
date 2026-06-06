@@ -180,17 +180,16 @@ class Command(BaseCommand):
                 'category': category,
                 'product_type': p_type,
                 'selling_price': price,
-                # REMOVED: 'stock_quantity', 'expiration_date'
                 'requires_prescription': requires_rx,
             }
         )
-        product.suppliers.add(supplier)
 
-        # FIX: Create a Batch to hold the stock
-        cost_price = price * Decimal('0.6')  # Simulate 60% margin
+        cost_price = price * Decimal('0.6')
+        
+        # FIX: Explicitly create the Batch at the ORM level
         batch, _ = Batch.objects.get_or_create(
             product=product,
-            batch_number=f"BAT-SEED-{product.id}", # Deterministic batch number for idempotency
+            batch_number=f"BAT-SEED-{product.id}", # Deterministic for idempotency
             defaults={
                 'quantity': 0, # Start at 0, movement will increment
                 'cost_price': cost_price,
@@ -199,16 +198,16 @@ class Command(BaseCommand):
             }
         )
 
-        # FIX: Use a unique reference so stock movements aren't duplicated on re-runs
+        # FIX: Create StockMovement targeting the explicit Batch
         reference_id = f"SEED-STOCK-{batch.id}"
         StockMovement.objects.get_or_create(
-            batch=batch, # FIX: Target batch, not product
             reference=reference_id,
             defaults={
+                'batch': batch, # Target the batch, NOT product_id
                 'movement_type': StockMovement.Reason.PURCHASE,
                 'quantity': stock_qty,
                 'supplier': supplier,
-                # REMOVED: 'unit_cost' (Tracked at Batch level now)
+                # REMOVED: product_id, cost_price, expiration_date (these are Serializer-only fields)
                 'created_by': self.admin
             }
         )

@@ -12,3 +12,4 @@ from .pos import *
 from .user import *
 from .product import *
 from .report import *
+from .batch import *

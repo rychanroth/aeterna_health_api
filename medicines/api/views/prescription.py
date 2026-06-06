@@ -3,10 +3,14 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from medicines.core.models import Prescription, Batch
+from medicines.core.models import Prescription, Batch, Sale, SaleItem
 from medicines.api.serializers import PrescriptionSerializer
 from medicines.api.permissions import IsAdmin, IsPharmacist
 from medicines.api.filters import PrescriptionFilter
+from django.db.models import F
+from django.db import transaction
+from django.core.exceptions import ValidationError
+
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
     queryset = Prescription.objects.all()

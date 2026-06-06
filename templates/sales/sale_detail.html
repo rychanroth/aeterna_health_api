@@ -27,13 +27,16 @@
 
     <!-- Prescription Link -->
     {% if sale.prescription %}
-    <div class="bg-purple-50 border border-purple-200 rounded p-3 mb-6 text-sm flex items-center gap-2">
-        <i class='bx bx-file text-purple-600 text-lg'></i>
-        <div>
-            <p class="font-bold text-purple-800">Linked Prescription</p>
-            <p class="text-purple-700">Rx ID: {{ sale.prescription }}</p>
+    <a href="{% url 'template-prescription-detail' sale.prescription_id %}" class="block group mb-6">
+        <div class="bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded p-3 text-sm flex items-center gap-3 transition-colors">
+            <i class='bx bx-file text-purple-600 text-xl'></i>
+            <div>
+                <!-- group-hover makes the text underline only when the user hovers anywhere on the card -->
+                <p class="font-bold text-purple-800 group-hover:underline">Linked Prescription</p>
+                <p class="text-purple-700">Rx ID: {{ sale.prescription.id }}</p>
+            </div>
         </div>
-    </div>
+    </a>
     {% endif %}
 
     <!-- Items Table -->

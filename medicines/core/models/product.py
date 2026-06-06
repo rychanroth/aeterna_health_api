@@ -43,7 +43,6 @@ class Product(UpdatableAbstractModel):
     product_type = models.ForeignKey('ProductType', on_delete=models.RESTRICT, null=True, blank=True, related_name='products')
     base_unit = models.CharField(max_length=20, choices=BaseUnit.choices, default=BaseUnit.TABLET)
     category = models.ForeignKey('Category', on_delete=models.RESTRICT, null=True, blank=True, related_name='products')
-    suppliers = models.ManyToManyField('Supplier', blank=True, related_name='products')
     description = models.TextField(blank=True)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     requires_prescription = models.BooleanField(default=False)
@@ -55,30 +54,7 @@ class Product(UpdatableAbstractModel):
     def __str__(self):
         return self.name
 
-    # --- COMPUTED PROPERTIES (Aggregated from Batches) ---
-
-    @property
-    def total_stock(self):
-        """Sum of all active batches."""
-        return sum(b.quantity for b in self.batches.filter(is_active=True))
-
-    @property
-    def nearest_expiration(self):
-        """Find the soonest expiration date among active batches."""
-        active_batches = self.batches.filter(is_active=True, expiration_date__isnull=False).order_by('expiration_date')
-        return active_batches.first().expiration_date if active_batches.exists() else None
-
-    @property
-    def is_expired(self):
-        """Check if ALL active batches are expired."""
-        active_batches = self.batches.filter(is_active=True, expiration_date__isnull=False)
-        if not active_batches.exists():
-            return False
-        return all(b.is_expired for b in active_batches)
-
-    @property
-    def is_low_stock(self):
-        return self.total_stock < 10
+    # FIX: DELETED properties, because it's moved to database-level annotations in the ViewSet
 
     @property
     def effective_requires_prescription(self):

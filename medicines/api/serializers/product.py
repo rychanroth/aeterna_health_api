@@ -1,16 +1,13 @@
 from rest_framework import serializers
-from medicines.core.models import Product, Category, Supplier, ProductType
+from medicines.core.models import Product, Category, ProductType
 from .category import CategorySerializer
-from .supplier import SupplierSerializer
 from .product_type import ProductTypeSerializer
 
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
-    suppliers = SupplierSerializer(many=True, read_only=True)
     product_type = ProductTypeSerializer(read_only=True)
 
     category_id = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), source='category', write_only=True, allow_null=True, required=False)
-    supplier_ids = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all(), source='suppliers', many=True, write_only=True, required=False)
     product_type_id = serializers.PrimaryKeyRelatedField(queryset=ProductType.objects.all(), source='product_type', write_only=True, allow_null=True, required=False)
 
     # REMOVED: is_expired, is_low_stock (Replaced by computed logic below)
@@ -25,10 +22,9 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'image', 
+            'id', 'name', 'image', 'description',
             'product_type', 'product_type_id', 'base_unit',
             'category', 'category_id',
-            'suppliers', 'supplier_ids', 'description',
             'selling_price', 'total_stock', 'nearest_expiration',
             'requires_prescription', 'effective_requires_prescription',
             'is_active', 'is_expired', 'is_low_stock',
@@ -43,6 +39,16 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         data = super().validate(data)
-        # FIX: Removed the expiration_date validation. 
-        # Expiration is now validated at the Batch level, not Product.
+        
+        # FIX: Enforce Category -> ProductType relationship
+        # Extract the objects from the validated data (resolved by PrimaryKeyRelatedField)
+        product_type = data.get('product_type') or (self.instance.product_type if self.instance else None)
+        category = data.get('category') or (self.instance.category if self.instance else None)
+
+        if product_type and category:
+            if category.product_type_id != product_type.id:
+                raise serializers.ValidationError({
+                    'category_id': f"Category '{category.name}' belongs to '{category.product_type.name}', not '{product_type.name}'."
+                })
+                
         return data

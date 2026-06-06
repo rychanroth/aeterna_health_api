@@ -24,11 +24,11 @@ class PrescriptionItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PrescriptionItem
         fields = [
-            'id', 'product_name', 'product_id',
+            'id', 'product', 'product_name', 'product_id',
             'batch_number', 'batch_id',
             'quantity_prescribed', 'dosage_instructions', 'is_dispensed'
         ]
-        read_only_fields = ['id', 'is_dispensed', 'product_name', 'batch_number']
+        read_only_fields = ['id', 'is_dispensed', 'product', 'product_name', 'batch_number']
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     items = PrescriptionItemSerializer(many=True)

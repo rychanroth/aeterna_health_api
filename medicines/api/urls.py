@@ -13,6 +13,7 @@ router.register(r'doctors', views.DoctorViewSet, basename='doctor')
 router.register(r'patients', views.PatientViewSet, basename='patient')
 router.register(r'prescriptions', views.PrescriptionViewSet, basename='prescription')
 router.register(r'stock-movements', views.StockMovementViewSet, basename='stock-movement')
+router.register(r'batches', views.BatchViewSet, basename='batch')
 router.register(r'reports', views.ReportViewSet, basename='reports')
 
 urlpatterns = [

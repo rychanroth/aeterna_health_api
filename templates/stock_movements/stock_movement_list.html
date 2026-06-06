@@ -35,7 +35,7 @@
         class="mb-6 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm" style="display: none;">
 
         <form method="GET" action="{% url 'template-stock-movement-list' %}">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
                 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Search Text</label>
@@ -84,6 +84,28 @@
                 </div>
             </div>
 
+            <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Batch Status</label>
+                <select name="batch_is_active"
+                    class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all font-medium text-slate-700">
+                    <option value="">All Batches</option>
+                    <option value="true" {% if batch_is_active == 'true' %}selected{% endif %}>Active</option>
+                    <option value="false" {% if batch_is_active == 'false' %}selected{% endif %}>Inactive / Depleted</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date }}"
+                    class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all font-medium text-slate-700">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date }}"
+                    class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all font-medium text-slate-700">
+            </div>
+
             <div class="flex justify-end gap-3 mt-5 pt-5 border-t border-slate-100">
                 <a href="{% url 'template-stock-movement-list' %}"
                     class="px-5 py-2 rounded-xl text-sm font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors">Clear All</a>
@@ -100,7 +122,7 @@
                     <tr class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
                         <th class="p-4">Date</th>
                         <th class="p-4">Product</th>
-                        <th class="p-4">Reason</th>
+                        <th class="p-4">Batch</th> <th class="p-4">Reason</th>
                         <th class="p-4">Direction</th>
                         <th class="p-4">Quantity</th>
                         <th class="p-4">Ref / Notes</th>
@@ -111,7 +133,11 @@
                     {% for mov in movements %}
                     <tr class="hover:bg-slate-50/80 transition-colors text-sm group">
                         <td class="p-4 text-slate-500 font-medium text-xs whitespace-nowrap">{{ mov.created_at|date:"M d, Y h:i A" }}</td>
+                        
                         <td class="p-4 font-bold text-slate-900">{{ mov.product_name }}</td>
+                        
+                        <td class="p-4 font-mono text-xs text-slate-600 font-medium">{{ mov.batch_number|default:"—" }}</td>
+                        
                         <td class="p-4 text-slate-600 font-medium">{{ mov.get_movement_type_display|default:mov.movement_type }}</td>
 
                         <td class="p-4">
@@ -132,6 +158,7 @@
                             <button type="button" @click="openDetails({
                                 date: '{{ mov.created_at|date:"M d, Y h:i A"|escapejs }}',
                                 product: '{{ mov.product_name|escapejs }}',
+                                batch: '{{ mov.batch_number|default:"N/A"|escapejs }}',
                                 type: '{{ mov.get_movement_type_display|default:mov.movement_type|escapejs }}',
                                 is_in: {{ mov.is_stock_in|yesno:"true,false" }},
                                 qty: '{{ mov.quantity }}',
@@ -146,7 +173,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="p-12 text-center">
+                        <td colspan="8" class="p-12 text-center">
                             <div class="flex flex-col items-center justify-center text-slate-400">
                                 <i class='bx bx-search-alt text-4xl mb-3'></i>
                                 <p class="font-medium text-sm">No recorded movements found matching the active filters.</p>
@@ -161,7 +188,7 @@
 
     <div class="flex justify-between items-center mt-6">
         {% if prev_page %}
-        <a href="?page={{ prev_page }}&search={{ search_query }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}"
+        <a href="?page={{ prev_page }}&search={{ search_query }}&direction={{ direction }}&product={{ product_id }}&batch_is_active={{ batch_is_active }}&start_date={{ start_date }}&end_date={{ end_date }}"
             class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl shadow-sm text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-2">
             <i class='bx bx-left-arrow-alt text-lg'></i> Previous
         </a>
@@ -172,7 +199,7 @@
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-4 py-2 rounded-lg">Page {{ current_page }}</span>
 
         {% if next_page %}
-        <a href="?page={{ next_page }}&search={{ search_query }}&direction={{ direction }}&product={{ product_id }}&start_date={{ start_date }}&end_date={{ end_date }}"
+        <a href="?page={{ next_page }}&search={{ search_query }}&direction={{ direction }}&product={{ product_id }}&batch_is_active={{ batch_is_active }}&start_date={{ start_date }}&end_date={{ end_date }}"
             class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl shadow-sm text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-2">
             Next <i class='bx bx-right-arrow-alt text-lg'></i>
         </a>
@@ -210,6 +237,15 @@
                         <div class="bg-emerald-50/50 rounded-2xl p-5 border border-emerald-100/50">
                             <label class="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-1">Target Product</label>
                             <p class="text-xl font-black text-emerald-950 leading-tight" x-text="detail.product"></p>
+                        </div>
+
+                        <div class="bg-emerald-50/50 rounded-2xl p-5 border border-emerald-100/50 relative">
+                            <label class="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-1">Target Product</label>
+                            <p class="text-xl font-black text-emerald-950 leading-tight" x-text="detail.product"></p>
+                            
+                            <div class="mt-3 inline-flex items-center gap-1.5 bg-white border border-emerald-200 px-2.5 py-1 rounded text-xs font-mono font-bold text-emerald-700 shadow-sm">
+                                <i class='bx bx-barcode'></i> <span x-text="detail.batch"></span>
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-2 gap-5">
@@ -279,7 +315,7 @@
         return {
             showFilters: initialProductId !== '' || window.location.search.includes('search='), 
             openDrawer: false, 
-            detail: { date: '', product: '', type: '', is_in: true, qty: '', ref: '', notes: '' },
+            detail: { date: '', product: '', batch: '', type: '', is_in: true, qty: '', ref: '', notes: '' },
             
             // Product Combobox State
             products: products,

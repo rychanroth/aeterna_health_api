@@ -3,6 +3,7 @@ import django_filters
 from django.db.models import Q
 from django.utils import timezone
 from medicines.core.models import *
+from datetime import timedelta
 
 class ProductFilter(django_filters.FilterSet):
     # Method filters for annotated/computed fields
@@ -34,6 +35,9 @@ class ProductFilter(django_filters.FilterSet):
 
 class BatchFilter(django_filters.FilterSet):
     is_expired = django_filters.BooleanFilter(method='filter_is_expired', label='Is Expired')
+    
+    # NEW: Filter for batches expiring within 30 days
+    expiring_soon = django_filters.BooleanFilter(method='filter_expiring_soon', label='Expiring Soon (30d)')
 
     class Meta:
         model = Batch
@@ -48,6 +52,14 @@ class BatchFilter(django_filters.FilterSet):
         if value:
             return queryset.filter(expiration_date__lt=today)
         return queryset.filter(expiration_date__gte=today)
+
+    def filter_expiring_soon(self, queryset, name, value):
+        today = timezone.now().date()
+        soon = today + timedelta(days=30)
+        if value:
+            # Not expired yet, but expires within 30 days
+            return queryset.filter(expiration_date__gte=today, expiration_date__lte=soon)
+        return queryset
 
 
 class CategoryFilter(django_filters.FilterSet):
@@ -140,6 +152,9 @@ class StockMovementFilter(django_filters.FilterSet):
     direction = django_filters.CharFilter(method='filter_direction', label='Direction (in/out)')
     start_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__gte')
     end_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__lte')
+    # NEW: Filter movements by the status of their associated batch
+    batch_is_active = django_filters.BooleanFilter(field_name='batch__is_active', label='Batch is Active')
+
 
     class Meta:
         model = StockMovement
