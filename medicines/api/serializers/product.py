@@ -39,6 +39,16 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         data = super().validate(data)
-        # FIX: Removed the expiration_date validation. 
-        # Expiration is now validated at the Batch level, not Product.
+        
+        # FIX: Enforce Category -> ProductType relationship
+        # Extract the objects from the validated data (resolved by PrimaryKeyRelatedField)
+        product_type = data.get('product_type') or (self.instance.product_type if self.instance else None)
+        category = data.get('category') or (self.instance.category if self.instance else None)
+
+        if product_type and category:
+            if category.product_type_id != product_type.id:
+                raise serializers.ValidationError({
+                    'category_id': f"Category '{category.name}' belongs to '{category.product_type.name}', not '{product_type.name}'."
+                })
+                
         return data
