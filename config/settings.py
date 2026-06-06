@@ -33,11 +33,23 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'local-dev-placeholder-never-use-this-
 ALLOWED_HOSTS = []
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    
+    # FIX CORS
+    CORS_ALLOWED_ORIGINS = [
+        f"https://{RENDER_EXTERNAL_HOSTNAME}",
+    ]
+    
+    # FIX CSRF (Required for POST requests from HTTPS frontend)
+    CSRF_TRUSTED_ORIGINS = [
+        f"https://{RENDER_EXTERNAL_HOSTNAME}",
+    ]
 else:
     ALLOWED_HOSTS.append('127.0.0.1')
     ALLOWED_HOSTS.append('localhost')
+    CORS_ALLOW_ALL_ORIGINS = True
 
 
 
@@ -154,13 +166,18 @@ STATICFILES_DIRS = [
 # This is where Django will collect static files for production
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Enable WhiteNoise compression and caching
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-API_BASE_URL = 'http://127.0.0.1:8000'
 
 # REST FRAMEWORK
 REST_FRAMEWORK = {
@@ -202,13 +219,3 @@ SPECTACULAR_SETTINGS = {
         }
     }
 }
-
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-else:
-    # In production: whitelist only your own domains
-    CORS_ALLOWED_ORIGINS = [
-        'whatever'
-    ]
-    CORS_ALLOW_ALL_ORIGINS = False
-
