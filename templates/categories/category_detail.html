@@ -101,6 +101,7 @@
         <thead>
             <tr class="bg-gray-100 border-b text-sm text-gray-600">
                 <th class="p-3">ID</th>
+                <th class="p-3">Image</th>
                 <th class="p-3">Product Name</th>
                 <th class="p-3">Stock</th>
                 <th class="p-3">Status</th>
@@ -111,7 +112,16 @@
             {% for prod in products %}
             <tr class="border-b hover:bg-gray-50 text-sm">
                 <td class="p-3 text-gray-600">{{ prod.id }}</td>
-                <td class="p-3 font-semibold text-gray-800">{{ prod.name }}</td>
+                <td>
+                    <div class="px-2 py-2">
+                        {% if prod.image %}<img src="{{ prod.image }}" class="w-10 h-10 object-cover rounded">{% else %}<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400">No Image</div>{% endif %}
+                    </div>
+                </td>
+                <td class="p-3 font-semibold text-gray-800">
+                    <a href="{% url 'template-product-detail' id=prod.id %}" class="hover:text-emerald-600 transition-colors">
+                        {{ prod.name }}
+                    </a>
+                </td>
                 <td class="p-3">{{ prod.quantity_in_stock|default:0 }}</td>
                 <td class="p-3">
                     {% if prod.is_active %}<span class="text-green-600 text-xs">Active</span>{% else %}<span class="text-red-600 text-xs">Inactive</span>{% endif %}
