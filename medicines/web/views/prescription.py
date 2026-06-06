@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 from django.utils.dateparse import parse_datetime
 from medicines.web.api_helper import *
 from medicines.web.decorators import *
+from decimal import Decimal, InvalidOperation
 
 def _parse_prescription_dates(prescriptions):
     for rx in prescriptions:
@@ -188,13 +189,14 @@ def prescription_dispense(request, id):
             messages.error(request, error_msg)
 
     # GET Request: Enrich prescription items with current product prices for display only
-    total_amount = 0
+    
+    total_amount = Decimal('0.00')
     enriched_items = []
 
     for item in prescription.get('items', []):
         prod_id = item.get('product')
-        qty = item.get('quantity_prescribed', 0)
-        price = 0.0
+        qty = int(item.get('quantity_prescribed', 0))
+        price = Decimal('0.00')
 
         if prod_id:
             prod_res = api_call('GET', f'/api/products/{prod_id}/', token=token)
@@ -202,11 +204,13 @@ def prescription_dispense(request, id):
                 prod_data = prod_res.json()
                 price_str = prod_data.get('selling_price', '0') or '0'
                 try:
-                    price = float(price_str)
-                except (ValueError, TypeError):
-                    price = 0.0
+                    # FIX: Use Decimal instead of float to prevent rounding errors
+                    price = Decimal(price_str)
+                except InvalidOperation:
+                    price = Decimal('0.00')
 
-        subtotal = qty * price
+        # FIX: Math is now strictly Decimal * Decimal
+        subtotal = Decimal(qty) * price
         total_amount += subtotal
 
         enriched_items.append({
