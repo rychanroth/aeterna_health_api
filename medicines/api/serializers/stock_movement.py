@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from medicines.core.models import StockMovement, Batch, Supplier, Sale, Product
 from django.db import transaction
+import datetime
 class StockMovementSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='batch.product.name')
     batch_number = serializers.ReadOnlyField(source='batch.batch_number')

@@ -140,6 +140,9 @@ class StockMovementFilter(django_filters.FilterSet):
     direction = django_filters.CharFilter(method='filter_direction', label='Direction (in/out)')
     start_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__gte')
     end_date = django_filters.DateFilter(field_name='created_at', lookup_expr='date__lte')
+    # NEW: Filter movements by the status of their associated batch
+    batch_is_active = django_filters.BooleanFilter(field_name='batch__is_active', label='Batch is Active')
+
 
     class Meta:
         model = StockMovement

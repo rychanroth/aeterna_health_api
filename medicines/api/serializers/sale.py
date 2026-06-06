@@ -78,11 +78,9 @@ class SaleItemSerializer(serializers.ModelSerializer):
 class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True)
     cashier_name = serializers.SerializerMethodField()
-    prescription_id = serializers.PrimaryKeyRelatedField(
-        queryset=Prescription.objects.all(),
-        source='prescription',
-        write_only=True,
-        allow_null=True,
+    # draw out from prescription field object, and bi-directional
+    prescription_id = serializers.IntegerField(
+        allow_null=True, 
         required=False
     )
 

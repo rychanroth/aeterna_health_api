@@ -25,6 +25,8 @@ def stock_movement_list(request):
     product_id = request.GET.get('product', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
+    # NEW: Capture batch status
+    batch_is_active = request.GET.get('batch_is_active', '')
 
     # 2. Build API parameters
     api_params = {k: v for k, v in {
@@ -34,6 +36,7 @@ def stock_movement_list(request):
         'product': product_id,
         'start_date': start_date,
         'end_date': end_date,
+        'batch_is_active': batch_is_active, # NEW: Include in API call
     }.items() if v}
 
     api_url = f'/api/stock-movements/?{urlencode(api_params)}'
@@ -67,7 +70,8 @@ def stock_movement_list(request):
         'product_id': product_id,
         'start_date': start_date, 
         'end_date': end_date,
-        'products_json': json.dumps(products), # Added JSON serialization
+        'batch_is_active': batch_is_active, # NEW: Pass back to template
+        'products_json': json.dumps(products),
     })
 
 @login_required_template
