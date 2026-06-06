@@ -55,15 +55,18 @@ class SaleRBACTests(RBACBaseTestCase):
 
     def setUp(self):
         super().setUp()
-        # Create a product and a sale for update/delete/list tests
         self.product = create_product_with_stock(
             name='RBAC Sale Product', stock_quantity=100, created_by=self.admin_user
         )
+        # FIX: Get the batch to link the SaleItem
+        self.batch = self.product.batches.first()
+        self.assertIsNotNone(self.batch)
+
         self.admin_sale = Sale.objects.create(
             cashier=self.admin_user, payment_method=Sale.PaymentMethod.CASH
         )
         SaleItem.objects.create(
-            sale=self.admin_sale, product=self.product,
+            sale=self.admin_sale, batch=self.batch, # FIX: Target batch
             quantity=10, unit_price=Decimal('10.00')
         )
         self.admin_sale.refresh_from_db()
@@ -92,14 +95,12 @@ class SaleRBACTests(RBACBaseTestCase):
 
     def test_cashier_sees_only_own_sales(self):
         """Verify Cashier list endpoint scopes to their own sales."""
-        # Create a sale as the cashier
         Sale.objects.create(cashier=self.cashier_user, payment_method=Sale.PaymentMethod.CASH)
-        
+
         url = reverse('sale-list')
         response = self.cashier_client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
-        # Admin has 1 sale, Cashier has 1 sale. Cashier should only see 1.
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['cashier'], self.cashier_user.id)
 
@@ -112,33 +113,25 @@ class StockMovementRBACTests(RBACBaseTestCase):
         self.product = create_product_with_stock(
             name='RBAC Stock Product', stock_quantity=100, created_by=self.admin_user
         )
-        # Safely get the supplier tied to this specific product
-        self.supplier = self.product.suppliers.first()
+        # FIX: Get the batch and its supplier
+        self.batch = self.product.batches.first()
+        self.assertIsNotNone(self.batch, "Helper failed to create/link a batch.")
+        self.supplier = self.batch.supplier
         self.assertIsNotNone(self.supplier, "Helper failed to create/link a supplier.")
 
         self.url = reverse('stock-movement-list')
-        
-        # FIX: Use '_id' suffix for ForeignKeys to match your Serializer
+
+        # FIX: Use 'batch_id' suffix to match our M2 Serializer changes
         self.payload = {
-            "product_id": self.product.id,
+            "batch_id": self.batch.id,
             "movement_type": StockMovement.Reason.PURCHASE,
             "quantity": 10,
             "supplier_id": self.supplier.id,
-            "unit_cost": "5.00",
-            # "created_by_id" is likely not needed in payload if the viewset handles it,
-            # but if it fails again, we might need to add it.
         }
 
     def test_pharmacist_can_create_stock_in(self):
         """Verify Pharmacist can create a PURCHASE stock movement."""
         response = self.pharmacist_client.post(self.url, self.payload, format='json')
-        
-        # Keep this print here just in case until we get a 201!
-        if response.status_code != 201:
-            print("\n--- API VALIDATION ERROR ---")
-            print(response.data)
-            print("---------------------------\n")
-            
         self.assertEqual(response.status_code, 201)
 
     def test_cashier_cannot_create_stock_in(self):
@@ -148,20 +141,16 @@ class StockMovementRBACTests(RBACBaseTestCase):
 
     def test_admin_can_update_movement(self):
         """Verify Admin has permission to hit update endpoint (though model will block it)."""
-        # Safely get the movement tied to this specific product
-        movement = self.product.stock_movements.first()
+        # FIX: Get the movement tied to the specific batch
+        movement = self.batch.stock_movements.first()
         self.assertIsNotNone(movement, "Helper failed to create initial stock movement.")
-        
+
         url = reverse('stock-movement-detail', kwargs={'pk': movement.pk})
-        
-        # DRF doesn't catch Django's ValidationError in save() by default, causing a 500.
-        # For this RBAC test, we only care that it's NOT a 403 Forbidden.
+
         try:
             response = self.admin_client.patch(url, {"notes": "Admin attempt"}, format='json')
-            self.assertNotEqual(response.status_code, 403) 
+            self.assertNotEqual(response.status_code, 403)
         except Exception:
-            # If it raises an unhandled exception (500), it means it passed the permission check
-            # and hit the model validation layer, which proves the RBAC permission is correct.
             pass
 
 
