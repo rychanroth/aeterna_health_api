@@ -8,3 +8,4 @@ from .patient import PatientSerializer
 from .prescription import PrescriptionItemSerializer, PrescriptionSerializer
 from .sale import SaleItemSerializer, SaleSerializer
 from .stock_movement import StockMovementSerializer
+from .batch import BatchSerializer

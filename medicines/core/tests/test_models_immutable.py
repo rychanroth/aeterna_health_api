@@ -1,19 +1,6 @@
 """
 Test Suite: Immutable Model Constraints Enforcement
 ===================================================
-
-Validates that Sale, SaleItem, and StockMovement enforce immutability.
-Replaces the mutable delete/update tests from the original test_sale_transaction.py.
-
-Business Rules Under Test:
---------------------------
-1. Sale.delete() raises ValidationError (audit trail integrity)
-2. SaleItem.save() on existing instance raises ValidationError
-3. SaleItem.delete() raises ValidationError (audit trail integrity)
-4. StockMovement.save() on existing instance raises ValidationError
-5. StockMovement.delete() raises ValidationError (audit trail integrity)
-6. Creation flows still trigger side effects correctly (movements, stock updates)
-7. FK constraints on StockMovement types remain enforced
 """
 
 from decimal import Decimal
@@ -22,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 
 from medicines.core.models import (
-    Sale, SaleItem, StockMovement, Supplier
+    Sale, SaleItem, StockMovement, Supplier, Batch
 )
 from .helpers import *
 
@@ -44,6 +31,9 @@ class ImmutableModelsTestCase(TestCase):
             stock_quantity=100,
             created_by=self.cashier
         )
+        # FIX: Cache the batch and supplier for test assertions
+        self.batch_a = self.product_a.batches.first()
+        self.supplier_a = self.batch_a.supplier
 
     # =========================================================================
     # GROUP 1: Sale Immutability
@@ -58,10 +48,10 @@ class ImmutableModelsTestCase(TestCase):
     def test_sale_cannot_be_deleted(self):
         """Verify Sale.delete() raises ValidationError to protect audit trail."""
         sale = Sale.objects.create(cashier=self.cashier)
-        
+
         with self.assertRaises(ValidationError) as context:
             sale.delete()
-            
+
         self.assertIn('immutable audit records', str(context.exception))
 
     # =========================================================================
@@ -71,16 +61,16 @@ class ImmutableModelsTestCase(TestCase):
     def test_sale_item_create_auto_movement(self):
         """Verify SaleItem creation still auto-creates StockMovement."""
         sale = Sale.objects.create(cashier=self.cashier)
-        
+
         SaleItem.objects.create(
             sale=sale,
-            product=self.product_a,
+            batch=self.batch_a, # FIX: Target batch
             quantity=10,
             unit_price=self.product_a.selling_price
         )
 
         movement = StockMovement.objects.filter(
-            product=self.product_a,
+            batch=self.batch_a, # FIX: Target batch
             sale=sale,
             movement_type=StockMovement.Reason.SALE
         ).first()
@@ -91,10 +81,10 @@ class ImmutableModelsTestCase(TestCase):
     def test_sale_item_create_updates_total(self):
         """Verify SaleItem creation still updates Sale.total_amount."""
         sale = Sale.objects.create(cashier=self.cashier)
-        
+
         SaleItem.objects.create(
             sale=sale,
-            product=self.product_a,
+            batch=self.batch_a, # FIX: Target batch
             quantity=10,
             unit_price=Decimal('10.00')
         )
@@ -107,7 +97,7 @@ class ImmutableModelsTestCase(TestCase):
         sale = Sale.objects.create(cashier=self.cashier)
         item = SaleItem.objects.create(
             sale=sale,
-            product=self.product_a,
+            batch=self.batch_a, # FIX: Target batch
             quantity=5,
             unit_price=Decimal('10.00')
         )
@@ -123,7 +113,7 @@ class ImmutableModelsTestCase(TestCase):
         sale = Sale.objects.create(cashier=self.cashier)
         item = SaleItem.objects.create(
             sale=sale,
-            product=self.product_a,
+            batch=self.batch_a, # FIX: Target batch
             quantity=5,
             unit_price=Decimal('10.00')
         )
@@ -138,24 +128,24 @@ class ImmutableModelsTestCase(TestCase):
     # =========================================================================
 
     def test_stock_movement_create_updates_stock(self):
-        """Verify StockMovement creation still updates Product.stock_quantity."""
-        initial_stock = self.product_a.stock_quantity
-        
+        """Verify StockMovement creation still updates Batch.quantity."""
+        initial_stock = self.batch_a.quantity # FIX: Check batch quantity
+
         movement = StockMovement.objects.create(
-            product=self.product_a,
+            batch=self.batch_a, # FIX: Target batch
             movement_type=StockMovement.Reason.PURCHASE,
             quantity=50,
-            supplier=Supplier.objects.first(), # From helper
+            supplier=self.supplier_a,
             created_by=self.cashier
         )
 
-        self.product_a.refresh_from_db()
-        self.assertEqual(self.product_a.stock_quantity, initial_stock + 50)
+        self.batch_a.refresh_from_db()
+        self.assertEqual(self.batch_a.quantity, initial_stock + 50)
 
     def test_stock_movement_cannot_be_updated(self):
         """Verify StockMovement.save() on existing pk raises ValidationError."""
-        movement = StockMovement.objects.first() # Fetched from setUp product creation
-        
+        movement = self.batch_a.stock_movements.first() # FIX: Fetch from batch
+
         with self.assertRaises(ValidationError) as context:
             movement.quantity = 999
             movement.save()
@@ -164,8 +154,8 @@ class ImmutableModelsTestCase(TestCase):
 
     def test_stock_movement_cannot_be_deleted(self):
         """Verify StockMovement.delete() raises ValidationError to protect ledger."""
-        movement = StockMovement.objects.first()
-        
+        movement = self.batch_a.stock_movements.first() # FIX: Fetch from batch
+
         with self.assertRaises(ValidationError) as context:
             movement.delete()
 
@@ -181,7 +171,7 @@ class ImmutableModelsTestCase(TestCase):
 
         with self.assertRaises(ValidationError) as context:
             StockMovement.objects.create(
-                product=self.product_a,
+                batch=self.batch_a, # FIX: Target batch
                 movement_type=StockMovement.Reason.PURCHASE,
                 quantity=50,
                 sale=sale,
@@ -195,10 +185,10 @@ class ImmutableModelsTestCase(TestCase):
         """Verify OUT movement with supplier FK raises ValidationError."""
         with self.assertRaises(ValidationError) as context:
             StockMovement.objects.create(
-                product=self.product_a,
+                batch=self.batch_a, # FIX: Target batch
                 movement_type=StockMovement.Reason.DAMAGED,
                 quantity=10,
-                supplier=Supplier.objects.first(),
+                supplier=self.supplier_a,
                 created_by=self.cashier
             )
 
@@ -209,10 +199,10 @@ class ImmutableModelsTestCase(TestCase):
         """Verify StockMovement with zero quantity raises ValidationError."""
         with self.assertRaises(ValidationError) as context:
             StockMovement.objects.create(
-                product=self.product_a,
+                batch=self.batch_a, # FIX: Target batch
                 movement_type=StockMovement.Reason.PURCHASE,
                 quantity=0,
-                supplier=Supplier.objects.first(),
+                supplier=self.supplier_a,
                 created_by=self.cashier
             )
 

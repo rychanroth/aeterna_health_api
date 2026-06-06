@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from django.db.models import Sum, Count
+from django.db.models import *
 from medicines.api.serializers import SaleSerializer
 from medicines.api.permissions import IsAdmin, IsCashier
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -12,7 +12,7 @@ from rest_framework import status
 from django.db import transaction
 from django.core.exceptions import ValidationError
 import datetime
-from medicines.core.models import Sale, Prescription, Product, SaleItem
+from medicines.core.models import Sale, Prescription, Product, SaleItem, Batch
 from medicines.api.filters import SaleFilter
 
 class SaleViewSet(viewsets.ModelViewSet):
@@ -72,8 +72,8 @@ class SaleViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='checkout', permission_classes=[IsAuthenticated])
     def checkout(self, request):
         """
-        Atomic POS checkout endpoint.
-        Payload: { "items": [{"product_id": 1, "quantity": 2}], "payment_method": "cash", "prescription_id": null }
+        Atomic POS checkout endpoint with FEFO Batch allocation.
+        Payload: { "items": [{"product_id": 1, "quantity": 2, "batch_id": null}], "payment_method": "cash", "prescription_id": null }
         """
         items_data = request.data.get('items', [])
         payment_method = request.data.get('payment_method', Sale.PaymentMethod.CASH)
@@ -99,35 +99,58 @@ class SaleViewSet(viewsets.ModelViewSet):
                 )
 
                 # 3. Process items: Validate stock, calculate prices, create movements
-                sale_items_payload = []
                 for item_data in items_data:
                     product_id = item_data.get('product_id')
                     quantity = int(item_data.get('quantity', 0))
+                    batch_id = item_data.get('batch_id') # Optional: Cashier can force a specific batch
 
                     if quantity <= 0:
                         raise ValidationError(f"Invalid quantity for product ID {product_id}")
 
-                    # Lock the product row for atomic stock check & deduction
-                    product = Product.objects.select_for_update().get(pk=product_id)
-
-                    if product.stock_quantity < quantity:
-                        raise ValidationError(f"Insufficient stock for {product.name}. Available: {product.stock_quantity}")
+                    # Fetch product for pricing and RX check
+                    product = Product.objects.get(pk=product_id)
 
                     if product.effective_requires_prescription and not prescription:
                         raise ValidationError(f"Product {product.name} requires a prescription.")
 
-                    # Server-side price calculation (never trust client)
-                    unit_price = product.selling_price
-                    subtotal = unit_price * quantity
+                    remaining_qty = quantity
+                    batches_to_sell = []
 
-                    sale_item = SaleItem.objects.create(
-                        sale=sale,
-                        product=product,
-                        quantity=quantity,
-                        unit_price=unit_price,
-                        subtotal=subtotal
-                    )
-                    # SaleItem.save() automatically creates the StockMovement and updates product stock
+                    if batch_id:
+                        # EXPLICIT BATCH SELECTION
+                        batch = Batch.objects.select_for_update().get(pk=batch_id)
+                        if batch.product_id != product.id:
+                            raise ValidationError(f"Batch {batch.batch_number} does not belong to product {product.name}.")
+                        if batch.quantity < remaining_qty:
+                            raise ValidationError(f"Insufficient stock in Batch {batch.batch_number}. Available: {batch.quantity}")
+                        batches_to_sell.append((batch, remaining_qty))
+                    else:
+                        # FEFO AUTO-ALLOCATION
+                        available_batches = Batch.objects.filter(
+                            product=product, is_active=True, quantity__gt=0
+                        ).order_by(F('expiration_date').asc(nulls_last=True)).select_for_update()
+
+                        if not available_batches.exists():
+                            raise ValidationError(f"No active stock available for {product.name}.")
+
+                        for batch in available_batches:
+                            if remaining_qty <= 0:
+                                break
+                            qty_to_take = min(remaining_qty, batch.quantity)
+                            batches_to_sell.append((batch, qty_to_take))
+                            remaining_qty -= qty_to_take
+
+                        if remaining_qty > 0:
+                            raise ValidationError(f"Insufficient stock for {product.name}. Short by {remaining_qty} units.")
+
+                    # Create SaleItems (which auto-create StockMovements & update batch quantities)
+                    for batch, qty in batches_to_sell:
+                        SaleItem.objects.create(
+                            sale=sale,
+                            batch=batch,
+                            quantity=qty,
+                            unit_price=product.selling_price
+                        )
 
                 # 4. Update Prescription Status if applicable
                 if prescription:
@@ -140,6 +163,8 @@ class SaleViewSet(viewsets.ModelViewSet):
 
         except Product.DoesNotExist:
             return Response({"error": "One or more products not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Batch.DoesNotExist:
+            return Response({"error": "Specified batch not found."}, status=status.HTTP_404_NOT_FOUND)
         except Prescription.DoesNotExist:
             return Response({"error": "Prescription not found."}, status=status.HTTP_404_NOT_FOUND)
         except ValidationError as e:

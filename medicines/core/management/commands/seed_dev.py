@@ -15,7 +15,7 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 
 from medicines.core.models import (
-    ProductType, Category, Supplier, Product, StockMovement,
+    ProductType, Category, Supplier, Product, Batch, StockMovement,
     Doctor, Patient, Prescription, Sale, SaleItem
 )
 
@@ -75,14 +75,13 @@ class Command(BaseCommand):
 
     def _seed_product_types_and_categories(self):
         self.stdout.write('Seeding Product Types & Categories...')
-        
+
         # Medicine Hierarchy
         self.med_type, _ = ProductType.objects.get_or_create(
             name='Medicine',
             defaults={'requires_expiration': True, 'requires_prescription': True}
         )
-        
-        # FIX: Only lookup by unique constraint fields, pass parent to defaults
+
         self.med_cat_root, _ = Category.objects.get_or_create(
             name='Medications', product_type=self.med_type, defaults={'parent': None}
         )
@@ -116,11 +115,11 @@ class Command(BaseCommand):
 
     def _seed_products(self):
         self.stdout.write('Seeding Products & Stock...')
-        
+
         # Medicines
         self.prod_amox = self._create_product_with_stock('Amoxicillin 500mg', self.med_cat_anti, self.med_type, self.supplier_a, Decimal('12.50'), 100, True)
         self.prod_ibuprofen = self._create_product_with_stock('Ibuprofen 200mg', self.med_cat_pain, self.med_type, self.supplier_a, Decimal('8.00'), 150, True)
-        
+
         # Equipment
         self.prod_thermometer = self._create_product_with_stock('Digital Thermometer', self.equip_cat_diag, self.equip_type, self.supplier_b, Decimal('25.00'), 40, False)
 
@@ -135,11 +134,11 @@ class Command(BaseCommand):
 
     def _seed_prescriptions(self):
         self.stdout.write('Seeding Prescriptions...')
-        # Pending RX - Using a forced prescription_number to avoid duplicates on re-run
+        # Pending RX
         Prescription.objects.get_or_create(
             prescription_number='RX-SEED-PEND-001',
             defaults={
-                'doctor': self.doctor, 
+                'doctor': self.doctor,
                 'patient': self.patient,
                 'prescription_date': date.today(),
                 'status': Prescription.Status.PENDING
@@ -149,7 +148,7 @@ class Command(BaseCommand):
         self.verified_rx, _ = Prescription.objects.get_or_create(
             prescription_number='RX-SEED-VERF-001',
             defaults={
-                'doctor': self.doctor, 
+                'doctor': self.doctor,
                 'patient': self.patient,
                 'prescription_date': date.today() - timedelta(days=1),
                 'status': Prescription.Status.VERIFIED
@@ -160,11 +159,15 @@ class Command(BaseCommand):
         self.stdout.write('Seeding Historical Sales...')
         # Only create sales if none exist to prevent massive duplicate data on re-runs
         if Sale.objects.count() == 0:
+            # FIX: Fetch the batches associated with the products
+            batch_ibuprofen = self.prod_ibuprofen.batches.first()
+            batch_thermometer = self.prod_thermometer.batches.first()
+
             sale1 = Sale.objects.create(cashier=self.cashier, payment_method=Sale.PaymentMethod.CASH)
-            SaleItem.objects.create(sale=sale1, product=self.prod_ibuprofen, quantity=2, unit_price=self.prod_ibuprofen.selling_price)
-            
+            SaleItem.objects.create(sale=sale1, batch=batch_ibuprofen, quantity=2, unit_price=self.prod_ibuprofen.selling_price)
+
             sale2 = Sale.objects.create(cashier=self.admin, payment_method=Sale.PaymentMethod.CARD)
-            SaleItem.objects.create(sale=sale2, product=self.prod_thermometer, quantity=1, unit_price=self.prod_thermometer.selling_price)
+            SaleItem.objects.create(sale=sale2, batch=batch_thermometer, quantity=1, unit_price=self.prod_thermometer.selling_price)
 
     # =========================================================================
     # HELPER METHODS
@@ -177,26 +180,38 @@ class Command(BaseCommand):
                 'category': category,
                 'product_type': p_type,
                 'selling_price': price,
-                'stock_quantity': 0,
+                # REMOVED: 'stock_quantity', 'expiration_date'
                 'requires_prescription': requires_rx,
-                'expiration_date': date.today() + timedelta(days=365) if p_type.requires_expiration else None
             }
         )
         product.suppliers.add(supplier)
-        
-        # FIX: Use a unique reference so stock movements aren't duplicated on re-runs
-        reference_id = f"SEED-STOCK-{product.id}"
-        StockMovement.objects.get_or_create(
+
+        # FIX: Create a Batch to hold the stock
+        cost_price = price * Decimal('0.6')  # Simulate 60% margin
+        batch, _ = Batch.objects.get_or_create(
             product=product,
+            batch_number=f"BAT-SEED-{product.id}", # Deterministic batch number for idempotency
+            defaults={
+                'quantity': 0, # Start at 0, movement will increment
+                'cost_price': cost_price,
+                'supplier': supplier,
+                'expiration_date': date.today() + timedelta(days=365) if p_type.requires_expiration else None
+            }
+        )
+
+        # FIX: Use a unique reference so stock movements aren't duplicated on re-runs
+        reference_id = f"SEED-STOCK-{batch.id}"
+        StockMovement.objects.get_or_create(
+            batch=batch, # FIX: Target batch, not product
             reference=reference_id,
             defaults={
                 'movement_type': StockMovement.Reason.PURCHASE,
                 'quantity': stock_qty,
                 'supplier': supplier,
-                'unit_cost': price * Decimal('0.6'), # Simulate 60% margin
+                # REMOVED: 'unit_cost' (Tracked at Batch level now)
                 'created_by': self.admin
             }
         )
         product.refresh_from_db()
-            
+
         return product
