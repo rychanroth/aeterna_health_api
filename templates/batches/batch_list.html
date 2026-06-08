@@ -19,19 +19,19 @@
            class="px-3 py-1.5 rounded shadow text-xs font-bold {% if not is_active and not is_expired and not expiring_soon %}bg-gray-800 text-white{% else %}bg-white text-gray-700 hover:bg-gray-100{% endif %}">
            All Lots
         </a>
-        <a href="?is_active=true" 
+        <a href="?is_active=true&ordering={{ ordering }}" 
            class="px-3 py-1.5 rounded shadow text-xs font-bold flex items-center gap-1 {% if is_active == 'true' %}bg-green-600 text-white{% else %}bg-green-100 text-green-800 hover:bg-green-200{% endif %}">
            <i class='bx bx-check-circle'></i> Active
         </a>
-        <a href="?expiring_soon=true" 
+        <a href="?expiring_soon=true&ordering={{ ordering }}" 
            class="px-3 py-1.5 rounded shadow text-xs font-bold flex items-center gap-1 {% if expiring_soon == 'true' %}bg-amber-500 text-white{% else %}bg-amber-100 text-amber-800 hover:bg-amber-200{% endif %}">
            <i class='bx bx-time-five'></i> Expiring Soon
         </a>
-        <a href="?is_expired=true" 
+        <a href="?is_expired=true&ordering={{ ordering }}" 
            class="px-3 py-1.5 rounded shadow text-xs font-bold flex items-center gap-1 {% if is_expired == 'true' %}bg-red-600 text-white{% else %}bg-red-100 text-red-800 hover:bg-red-200{% endif %}">
            <i class='bx bx-calendar-exclamation'></i> Expired
         </a>
-        <a href="?is_active=false" 
+        <a href="?is_active=false&ordering={{ ordering }}" 
            class="px-3 py-1.5 rounded shadow text-xs font-bold flex items-center gap-1 {% if is_active == 'false' %}bg-gray-600 text-white{% else %}bg-gray-200 text-gray-800 hover:bg-gray-300{% endif %}">
            <i class='bx bx-package'></i> Depleted
         </a>
@@ -45,6 +45,20 @@
         <div class="flex-1">
             <input type="text" name="search" value="{{ search_query }}" placeholder="Search Batch # or Product Name..." class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
         </div>
+
+        <!-- NEW: Order By Dropdown -->
+        <div>
+            <select name="ordering" class="border border-gray-300 rounded px-3 py-2 bg-white text-sm h-10 font-medium focus:outline-none focus:border-blue-500">
+                <option value="expiration_date" {% if ordering == 'expiration_date' %}selected{% endif %}>Expiry (Soonest)</option>
+                <option value="-expiration_date" {% if ordering == '-expiration_date' %}selected{% endif %}>Expiry (Latest)</option>
+                <option value="-received_date" {% if ordering == '-received_date' %}selected{% endif %}>Received (Newest)</option>
+                <option value="received_date" {% if ordering == 'received_date' %}selected{% endif %}>Received (Oldest)</option>
+                <option value="-quantity" {% if ordering == '-quantity' %}selected{% endif %}>Quantity (High to Low)</option>
+                <option value="quantity" {% if ordering == 'quantity' %}selected{% endif %}>Quantity (Low to High)</option>
+                <option value="-created_at" {% if ordering == '-created_at' %}selected{% endif %}>Created (Newest)</option>
+            </select>
+        </div>
+
         <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 h-10 text-sm font-bold">Search</button>
         <a href="{% url 'template-batch-list' %}" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 h-10 text-sm font-bold">Clear</a>
     </div>
@@ -93,7 +107,6 @@
                     {% elif batch.is_expired %}
                         <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded font-bold">Expired</span>
                     {% elif batch.expiration_date %}
-                        <!-- Check if expiring within 30 days dynamically in template if possible, or rely on API filter -->
                         <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold">Active</span>
                     {% else %}
                         <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold">Active</span>
@@ -114,7 +127,7 @@
     <!-- Pagination -->
     <div class="p-4 flex justify-between items-center border-t bg-gray-50">
         {% if prev_page %}
-        <a href="?page={{ prev_page }}&search={{ search_query }}&is_active={{ is_active }}&is_expired={{ is_expired }}&expiring_soon={{ expiring_soon }}" class="text-sm text-blue-600 hover:underline">&larr; Previous</a>
+        <a href="?page={{ prev_page }}&search={{ search_query }}&is_active={{ is_active }}&is_expired={{ is_expired }}&expiring_soon={{ expiring_soon }}&ordering={{ ordering }}" class="text-sm text-blue-600 hover:underline">&larr; Previous</a>
         {% else %}
         <span class="text-sm text-gray-400">&larr; Previous</span>
         {% endif %}
@@ -122,7 +135,7 @@
         <span class="text-sm text-gray-600 font-bold">Page {{ current_page }}</span>
         
         {% if next_page %}
-        <a href="?page={{ next_page }}&search={{ search_query }}&is_active={{ is_active }}&is_expired={{ is_expired }}&expiring_soon={{ expiring_soon }}" class="text-sm text-blue-600 hover:underline">Next &rarr;</a>
+        <a href="?page={{ next_page }}&search={{ search_query }}&is_active={{ is_active }}&is_expired={{ is_expired }}&expiring_soon={{ expiring_soon }}&ordering={{ ordering }}" class="text-sm text-blue-600 hover:underline">Next &rarr;</a>
         {% else %}
         <span class="text-sm text-gray-400">Next &rarr;</span>
         {% endif %}
