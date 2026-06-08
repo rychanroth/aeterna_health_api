@@ -4,7 +4,7 @@ from django.contrib import messages
 from urllib.parse import urlencode
 from medicines.web.api_helper import *
 from medicines.web.decorators import *
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_datetime, parse_date
 
 @login_required_template
 @pharmacy_staff_required
@@ -66,6 +66,12 @@ def batch_detail(request, id):
         return redirect('template-batch-list')
     batch = batch_response.json()
 
+    if batch.get('expiration_date'):
+        batch['expiration_date'] = parse_date(batch['expiration_date'])
+
+    if batch.get('created_at'):
+        batch['created_at'] = parse_datetime(batch['created_at'])
+
     # 2. Fetch the Stock Movements for this specific Batch
     current_page = request.GET.get('page', 1)
     api_url = f'/api/stock-movements/?batch={id}&page={current_page}&ordering=-created_at'
@@ -75,7 +81,16 @@ def batch_detail(request, id):
     if movements_response.status_code == 200:
         data = movements_response.json()
         movements = data.get('results', [])
+        
+        # ---> FIX: Parse the created_at strings into Python datetime objects <---
+        for mov in movements:
+            if mov.get('created_at'):
+                mov['created_at'] = parse_datetime(mov['created_at'])
+        # ------------------------------------------------------------------------
+
         count = data.get('count', 0)
+        if data.get('next'): next_page = data['next'].split('page=')[-1]
+        if data.get('previous'): prev_page = 1 if 'page=' not in data['previous'] else data['previous'].split('page=')[-1]
 
     return render(request, 'batches/batch_detail.html', {
         'batch': batch,
