@@ -134,7 +134,11 @@
                     <tr class="hover:bg-slate-50/80 transition-colors text-sm group">
                         <td class="p-4 text-slate-500 font-medium text-xs whitespace-nowrap">{{ mov.created_at|date:"M d, Y h:i A" }}</td>
                         
-                        <td class="p-4 font-bold text-slate-900">{{ mov.product_name }}</td>
+                        <td class="p-4 font-bold text-slate-900">
+                            <a href="{% url 'template-stock-movement-detail' mov.id %}" class="hover:text-blue-600 hover:underline">
+                                {{ mov.product_name }}
+                            </a>
+                        </td>
                         
                         <td class="p-4 font-mono text-xs text-slate-600 font-medium">{{ mov.batch_number|default:"—" }}</td>
                         
