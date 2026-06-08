@@ -1,5 +1,36 @@
 import requests
 from django.conf import settings
+import re
+from django.utils.dateparse import parse_date, parse_datetime
+
+# Regex patterns to safely match ISO dates without false positives
+ISO_DATETIME_RE = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$')
+ISO_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+def parse_iso_strings(data):
+    """
+    Recursively walks through dicts and lists, automatically converting 
+    ISO-8601 date/datetime strings into Python date/datetime objects.
+    """
+    if isinstance(data, dict):
+        return {k: parse_iso_strings(v) for k, v in data.items()}
+    
+    elif isinstance(data, list):
+        return [parse_iso_strings(item) for item in data]
+    
+    elif isinstance(data, str):
+        # Check for full datetimes first
+        if ISO_DATETIME_RE.match(data):
+            dt = parse_datetime(data)
+            if dt is not None:
+                return dt
+        # Check for standalone dates (e.g., expiration_date)
+        elif ISO_DATE_RE.match(data):
+            d = parse_date(data)
+            if d is not None:
+                return d
+                
+    return data
 
 def api_call(method, endpoint, data=None, token=None, files=None):
     """
@@ -29,6 +60,16 @@ def api_call(method, endpoint, data=None, token=None, files=None):
     else:
         raise ValueError(f"Unsupported method: {method}")
 
+    # MONKEY-PATCH THE RESPONSE: Inject our parser transparently into .json()
+    if response.status_code in [200, 201]:
+        original_json_method = response.json
+        
+        def auto_parsing_json(*args, **kwargs):
+            raw_payload = original_json_method(*args, **kwargs)
+            return parse_iso_strings(raw_payload)
+            
+        response.json = auto_parsing_json
+
     return response
 
 def fetch_all_api_data(endpoint, token):
@@ -40,15 +81,17 @@ def fetch_all_api_data(endpoint, token):
     
     # Ensure endpoint has query param separator
     separator = '&' if '?' in endpoint else '?'
-    base_url = f"{getattr(settings, 'API_BASE_URL', 'http://127.0.0.1:8000')}{endpoint}"
+    page_endpoint = f"{endpoint}{separator}page={page}"
     
     while True:
-        headers = {}
-        if token:
-            headers['Authorization'] = f'Token {token}'
-            
-        url = f"{base_url}{separator}page={page}"
-        response = requests.get(url, headers=headers)
+        # Construct the page-specific endpoint path
+        page_endpoint = f"{endpoint}{separator}page={page}"
+        
+        # Route through api_call to take advantage of centralized headers and auto-parsing
+        response = api_call('GET', page_endpoint, token=token)
+        
+        if response.status_code == 200:
+            data = response.json()
         
         if response.status_code == 200:
             data = response.json()
