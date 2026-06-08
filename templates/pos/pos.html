@@ -78,8 +78,8 @@
                 <div class="grid grid-cols-3 gap-4">
                     <template x-for="prod in filteredProducts" :key="prod.id">
                         <button @click="openProductDetails(prod)" 
-                                :disabled="!prod.is_active || prod.is_expired || prod.effective_requires_prescription || prod.requires_prescription || prod.stock_quantity <= 0"
-                                :class="(!prod.is_active || prod.is_expired || prod.effective_requires_prescription || prod.requires_prescription || prod.stock_quantity <= 0) 
+                                :disabled="!prod.is_active || prod.is_expired || prod.effective_requires_prescription || prod.requires_prescription || prod.total_stock <= 0"
+                                :class="(!prod.is_active || prod.is_expired || prod.effective_requires_prescription || prod.requires_prescription || prod.total_stock <= 0) 
                                     ? 'opacity-60 bg-gray-100 cursor-not-allowed border-gray-200' 
                                     : 'bg-white hover:border-teal-500 hover:shadow-md cursor-pointer'"
                                 class="p-3 rounded-xl border border-gray-200 transition-all text-left flex gap-3 h-36 relative overflow-hidden group">
@@ -102,7 +102,8 @@
                                             <span x-show="!prod.is_active" class="text-[8px] font-extrabold text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Inactive</span>
                                             <span x-show="prod.is_expired" class="text-[8px] font-extrabold text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Expired</span>
                                             <span x-show="prod.effective_requires_prescription || prod.requires_prescription" class="text-[8px] font-extrabold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">Rx</span>
-                                            <span x-show="prod.stock_quantity <= 0 && prod.is_active && !prod.is_expired" class="text-[8px] font-extrabold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">OUT</span>
+                                            <!-- FIX: Use total_stock -->
+                                            <span x-show="prod.total_stock <= 0 && prod.is_active && !prod.is_expired" class="text-[8px] font-extrabold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">OUT</span>
                                         </div>
                                     </div>
                                     <p class="text-xs text-gray-400 mt-0.5" x-text="prod.base_unit"></p>
@@ -110,7 +111,8 @@
                                 
                                 <div class="flex justify-between items-end mt-auto">
                                     <p class="text-teal-700 font-extrabold text-base" x-text="'$' + parseFloat(prod.selling_price).toFixed(2)"></p>
-                                    <p class="text-[10px] text-gray-400 font-medium" x-text="prod.stock_quantity + ' left'"></p>
+                                    <!-- FIX: Use total_stock -->
+                                    <p class="text-[10px] text-gray-400 font-medium" x-text="prod.total_stock + ' left'"></p>
                                 </div>
                             </div>
                         </button>
@@ -127,6 +129,7 @@
                 </div>
             </div>
 
+            <!-- Product Detail Slide-over -->
             <div x-show="selectedProduct"
                 x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-x-full" x-transition:enter-end="opacity-100 translate-x-0"
                 x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 -translate-x-full"
@@ -163,14 +166,6 @@
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Description</h4>
                                     <p class="text-sm text-gray-600 leading-relaxed" x-text="selectedProduct.description || 'No detailed description available.'"></p>
                                 </div>
-                                
-                                <div x-show="selectedProduct.suppliers && selectedProduct.suppliers.length > 0">
-                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Primary Supplier</h4>
-                                    <p class="text-sm text-gray-700 font-medium flex items-center gap-2">
-                                        <i class='bx bx-buildings text-gray-400'></i>
-                                        <span x-text="selectedProduct.suppliers[0]?.name"></span>
-                                    </p>
-                                </div>
                             </div>
                         </div>
 
@@ -200,31 +195,52 @@
                                     </div>
 
                                     <div class="bg-gray-50 border border-gray-200 p-4 rounded-xl shadow-sm flex flex-col justify-center relative">
+                                        <!-- FIX: Use total_stock -->
                                         <span class="text-xs font-bold text-gray-600 uppercase mb-1">Available Stock</span>
-                                        <span class="text-3xl font-bold" :class="selectedProduct.stock_quantity <= 5 ? 'text-red-600' : 'text-gray-900'" x-text="selectedProduct.stock_quantity"></span>
+                                        <span class="text-3xl font-bold" :class="selectedProduct.total_stock <= 5 ? 'text-red-600' : 'text-gray-900'" x-text="selectedProduct.total_stock"></span>
                                         <span class="absolute bottom-4 right-4 text-gray-400 text-sm font-medium" x-text="selectedProduct.base_unit + 's'"></span>
                                     </div>
                                 </div>
 
-                                <div x-show="selectedProduct.expiration_date" class="p-3 rounded-lg border flex items-center gap-3" 
+                                <!-- FIX: Use nearest_expiration instead of expiration_date -->
+                                <div x-show="selectedProduct.nearest_expiration" class="p-3 rounded-lg border flex items-center gap-3 mb-4" 
                                     :class="selectedProduct.is_expired ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-600'">
                                     <i class='bx bx-calendar-x text-2xl'></i>
                                     <div>
-                                        <p class="text-xs font-bold uppercase tracking-wider opacity-80">Expiration Date</p>
-                                        <p class="font-semibold" x-text="selectedProduct.expiration_date"></p>
+                                        <p class="text-xs font-bold uppercase tracking-wider opacity-80">Nearest Expiration</p>
+                                        <p class="font-semibold" x-text="selectedProduct.nearest_expiration"></p>
                                     </div>
                                     <span x-show="selectedProduct.is_expired" class="ml-auto font-extrabold uppercase tracking-wider text-sm bg-red-200 px-2 py-1 rounded">Expired</span>
                                 </div>
+
+                                <!-- NEW: Display Active Batches for transparency -->
+                                <div x-show="productBatches.length > 0" class="mt-2">
+                                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                        <i class='bx bx-list-ul'></i> Inventory Lots (FEFO)
+                                    </h4>
+                                    <div class="space-y-1.5 max-h-24 overflow-y-auto hide-scrollbar">
+                                        <template x-for="bat in productBatches" :key="bat.id">
+                                            <div class="flex justify-between items-center bg-white border border-gray-100 px-3 py-1.5 rounded-md text-xs shadow-sm">
+                                                <span class="font-mono text-gray-500" x-text="bat.batch_number"></span>
+                                                <span class="font-bold text-gray-800" x-text="'Qty: ' + bat.quantity"></span>
+                                                <span class="text-gray-500" x-text="bat.expiration_date ? 'Exp: ' + bat.expiration_date : 'No Exp'"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <p class="text-[10px] text-teal-600 mt-1 font-medium"><i class='bx bx-info-circle'></i> System automatically sells shortest expiry first.</p>
+                                </div>
+
                             </div>
                             
                             <button @click="addToCart(selectedProduct); selectedProduct = null;"
-                                    :disabled="selectedProduct.stock_quantity <= 0 || selectedProduct.is_expired"
+                                    :disabled="selectedProduct.total_stock <= 0 || selectedProduct.is_expired"
                                     class="w-full py-4 rounded-xl font-extrabold text-xl transition flex items-center justify-center space-x-2 shadow-lg active:scale-[0.98] mt-6"
-                                    :class="(selectedProduct.stock_quantity <= 0 || selectedProduct.is_expired) 
+                                    :class="(selectedProduct.total_stock <= 0 || selectedProduct.is_expired) 
                                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' 
                                             : 'bg-teal-600 text-white hover:bg-teal-700 shadow-teal-600/20'">
                                 <i class='bx bx-cart-add text-2xl'></i>
-                                <span x-text="(selectedProduct.stock_quantity <= 0) ? 'Out of Stock' : (selectedProduct.is_expired ? 'Cannot Sell Expired' : 'Add to Cart')"></span>
+                                <!-- FIX: Use total_stock -->
+                                <span x-text="(selectedProduct.total_stock <= 0) ? 'Out of Stock' : (selectedProduct.is_expired ? 'Cannot Sell Expired' : 'Add to Cart')"></span>
                             </button>
                         </div>
                     </div>
@@ -232,6 +248,7 @@
             </div>
         </div>
 
+        <!-- Cart Column (No changes needed to layout, only JS logic below) -->
         <div class="col-span-2 flex flex-col bg-white">
             <div class="px-5 py-4 border-b font-bold text-gray-800 flex justify-between items-center bg-gray-50 shrink-0">
                 <span class="text-lg">Current Sale</span>
@@ -286,6 +303,7 @@
         </div>
     </div>
 
+    <!-- Checkout Modal -->
     <div x-show="showConfirmCheckout" style="display: none;"
          x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm">
         
@@ -322,6 +340,7 @@
         </div>
     </div>
 
+    <!-- Success Toast -->
     <div x-show="showSuccess" style="display: none;"
          x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
          class="fixed bottom-8 right-8 bg-white border border-gray-100 px-6 py-5 rounded-2xl shadow-2xl z-50 flex items-center gap-6 max-w-md w-full">
@@ -347,6 +366,7 @@
         </div>
     </div>
 
+    <!-- Hidden Receipt Template -->
     <div class="thermal-receipt hidden" id="thermal-receipt">
         <div class="text-center mb-2">
             <p class="font-bold text-base">AETERNA PHARMACY</p>
@@ -380,6 +400,7 @@
         <p class="text-center text-xs">Thank you for your purchase!</p>
     </div>
 
+    <!-- History Modal -->
     <div x-show="showHistoryModal" style="display: none;"
         x-transition.opacity
         class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm">
@@ -451,6 +472,7 @@
                 isLoading: false,
                 cart: [],
                 selectedProduct: null,
+                productBatches: [], // NEW: Store batches for the selected product
                 
                 // Checkout State
                 paymentMethod: 'cash',
@@ -480,28 +502,23 @@
                     this.historyError = '';
                     
                     try {
-                        // Build headers dynamically and attach the token
                         const headers = { 'Content-Type': 'application/json' };
-                        if (this.token) {
-                            headers['Authorization'] = `Token ${this.token}`; // Change to `Bearer ${this.token}` if using JWT
-                        }
+                        if (this.token) headers['Authorization'] = `Token ${this.token}`;
 
                         const res = await fetch('/api/sales/my_sales/', { 
                             method: 'GET',
                             credentials: 'include',
-                            headers: headers // <-- Attach the headers containing the authorization token
+                            headers: headers
                         });
                         const data = await res.json();
                         
                         if (res.ok) {
-                            // DRF might return an array directly, or paginated inside 'results'
                             this.salesHistory = Array.isArray(data) ? data : (data.results || []);
                         } else {
                             this.historyError = data.detail || 'Failed to load sales history.';
                         }
                     } catch (e) {
                         this.historyError = 'Network error loading history.';
-                        console.error(e);
                     } finally {
                         this.isLoadingHistory = false;
                     }
@@ -510,7 +527,6 @@
                 formatDate(dateString) {
                     if (!dateString) return '';
                     const date = new Date(dateString);
-                    // Formats to something like "3:45 PM"
                     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 },
 
@@ -521,17 +537,13 @@
                             ? `/api/products/?search=${this.searchQuery}&page_size=30`
                             : `/api/products/?page_size=20`;
                             
-                        // Build the headers dynamically
                         const headers = { 'Content-Type': 'application/json' };
-                        if (this.token) {
-                            // Change 'Token' to 'Bearer' if you are using JWT instead of DRF Authtoken
-                            headers['Authorization'] = `Token ${this.token}`; 
-                        }
+                        if (this.token) headers['Authorization'] = `Token ${this.token}`;
 
                         const res = await fetch(url, {
                             method: 'GET',
                             credentials: 'include',
-                            headers: headers // <-- Pass the headers here
+                            headers: headers
                         });
                         const data = await res.json();
                         this.filteredProducts = data.results || [];
@@ -542,18 +554,37 @@
                     }
                 },
 
-                openProductDetails(product) {
-                    if (product.stock_quantity > 0) {
-                        this.selectedProduct = product;
+                // NEW: Fetch active batches when viewing product details
+                async openProductDetails(prod) {
+                    // FIX: Use total_stock
+                    if (prod.total_stock <= 0) return;
+                    this.selectedProduct = prod;
+                    this.productBatches = []; // Reset
+
+                    try {
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (this.token) headers['Authorization'] = `Token ${this.token}`;
+
+                        const res = await fetch(`/api/batches/?product=${prod.id}&is_active=true&ordering=expiration_date`, {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: headers
+                        });
+                        const data = await res.json();
+                        this.productBatches = data.results || data || [];
+                    } catch (e) {
+                        console.error("Failed to load batches:", e);
                     }
                 },
 
                 addToCart(product) {
-                    if (product.stock_quantity <= 0) return;
+                    // FIX: Use total_stock
+                    if (product.total_stock <= 0) return;
                     
                     const existingIndex = this.cart.findIndex(i => i.id === product.id);
                     if (existingIndex > -1) {
-                        if (this.cart[existingIndex].qty < product.stock_quantity) {
+                        // FIX: Use total_stock
+                        if (this.cart[existingIndex].qty < product.total_stock) {
                             this.cart[existingIndex].qty++;
                         }
                     } else {
@@ -562,7 +593,8 @@
                             name: product.name,
                             price: parseFloat(product.selling_price),
                             qty: 1,
-                            maxStock: product.stock_quantity,
+                            // FIX: Use total_stock
+                            maxStock: product.total_stock,
                             requiresRx: product.effective_requires_prescription
                         });
                     }
@@ -607,6 +639,8 @@
                     this.isProcessing = true;
                     this.checkoutError = '';
 
+                    // Payload strictly sends product_id. 
+                    // The API's FEFO logic will automatically deduct from the correct batch!
                     const payload = {
                         items: this.cart.map(item => ({ product_id: item.id, quantity: item.qty })),
                         payment_method: this.paymentMethod
@@ -618,9 +652,7 @@
                             'Content-Type': 'application/json',
                             'X-CSRFToken': csrftoken
                         };
-                        if (this.token) {
-                            headers['Authorization'] = `Token ${this.token}`;
-                        }
+                        if (this.token) headers['Authorization'] = `Token ${this.token}`;
 
                         const res = await fetch('/api/sales/checkout/', {
                             method: 'POST',
@@ -631,14 +663,14 @@
                         const data = await res.json();
 
                         if (res.status === 201 || res.status === 200) {
-                            // Save success state
                             this.lastSaleNumber = data.sale_number || data.id || 'N/A';
                             this.lastCartSnapshot = JSON.parse(JSON.stringify(this.cart));
                             
                             // Adjust UI Stock instantly
                             this.cart.forEach(cartItem => {
                                 let gridProd = this.filteredProducts.find(p => p.id === cartItem.id);
-                                if (gridProd) gridProd.stock_quantity -= cartItem.qty;
+                                // FIX: Use total_stock
+                                if (gridProd) gridProd.total_stock -= cartItem.qty;
                             });
 
                             this.showConfirmCheckout = false;
