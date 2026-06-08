@@ -41,7 +41,7 @@ def doctor_create(request):
 
     if request.method == 'POST':
         old_input = request.POST.dict()
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        old_input['is_active'] = 'is_active' in request.POST
         
         payload = {
             'name': old_input.get('name'), 'license_number': old_input.get('license_number'),
@@ -84,7 +84,7 @@ def doctor_edit(request, id):
 
     if request.method == 'POST':
         old_input = request.POST.dict()
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        old_input['is_active'] = 'is_active' in request.POST
         payload = {
             'name': old_input.get('name'), 'license_number': old_input.get('license_number'),
             'phone': old_input.get('phone'), 'clinic_name': old_input.get('clinic_name'),

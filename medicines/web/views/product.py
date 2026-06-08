@@ -36,6 +36,7 @@ def product_list(request):
         'next_page': next_page, 'prev_page': prev_page, 'current_page': current_page,
         'search_query': search_query, 'low_stock': low_stock, 'expired': expired,
     })
+# medicines/web/views/product.py
 
 @login_required_template
 @pharmacy_staff_required
@@ -45,21 +46,19 @@ def product_create(request):
     old_input = request.POST.dict() if request.method == 'POST' else {}
 
     if request.method == 'POST':
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
-        old_input['requires_prescription'] = request.POST.get('requires_prescription') == 'on'
+        # FIX: Use 'in request.POST' instead of '== "on"'
+        old_input['is_active'] = 'is_active' in request.POST
+        old_input['requires_prescription'] = 'requires_prescription' in request.POST
 
         payload = {
             'name': old_input.get('name'),
             'description': old_input.get('description'),
             'base_unit': old_input.get('base_unit'),
             'selling_price': old_input.get('selling_price'),
-            # FIX: Removed 'stock_quantity' and 'expiration_date'. 
-            # These are now handled via the Batch/Receive Stock workflow.
             'category_id': old_input.get('category_id') or None,
             'product_type_id': old_input.get('product_type_id') or None,
             'requires_prescription': old_input['requires_prescription'],
             'is_active': old_input['is_active'],
-            # FIX: Removed supplier_ids
         }
 
         files = {'image': request.FILES['image']} if 'image' in request.FILES else None
@@ -115,7 +114,7 @@ def product_edit(request, id):
 
     if request.method == 'POST':
         old_input = request.POST.dict()
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        old_input['is_active'] = 'is_active' in request.POST
         old_input['requires_prescription'] = request.POST.get('requires_prescription') == 'on'
 
         payload = {

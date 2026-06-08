@@ -52,7 +52,7 @@ def product_type_create(request):
         # Handle checkboxes explicitly
         old_input['requires_prescription'] = request.POST.get('requires_prescription') == 'on'
         old_input['requires_expiration'] = request.POST.get('requires_expiration') == 'on'
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        old_input['is_active'] = 'is_active' in request.POST
 
         payload = {
             'name': old_input.get('name'),
@@ -121,7 +121,7 @@ def product_type_edit(request, id):
         old_input = request.POST.dict()
         old_input['requires_prescription'] = request.POST.get('requires_prescription') == 'on'
         old_input['requires_expiration'] = request.POST.get('requires_expiration') == 'on'
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        old_input['is_active'] = 'is_active' in request.POST
 
         payload = {
             'name': old_input.get('name'),

@@ -49,7 +49,7 @@ def supplier_create(request):
 
     if request.method == 'POST':
         old_input = request.POST.dict()
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        old_input['is_active'] = 'is_active' in request.POST
 
         payload = {
             'name': old_input.get('name'),
@@ -107,7 +107,7 @@ def supplier_edit(request, id):
 
     if request.method == 'POST':
         old_input = request.POST.dict()
-        old_input['is_active'] = request.POST.get('is_active') == 'on'
+        old_input['is_active'] = 'is_active' in request.POST
 
         payload = {
             'name': old_input.get('name'),
