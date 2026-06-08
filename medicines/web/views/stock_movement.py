@@ -74,6 +74,7 @@ def stock_movement_list(request):
         'products_json': json.dumps(products),
     })
 
+
 @login_required_template
 @pharmacy_staff_required
 def stock_movement_create(request):
@@ -83,8 +84,6 @@ def stock_movement_create(request):
 
     if request.method == 'POST':
         movement_type = old_input.get('movement_type')
-        
-        # Base payload for all movements
         payload = {
             'movement_type': movement_type,
             'quantity': old_input.get('quantity'),
@@ -92,9 +91,7 @@ def stock_movement_create(request):
             'notes': old_input.get('notes', ''),
         }
 
-        # FIX: Dynamic payload based on movement reason
         if movement_type == 'purchase':
-            # Auto-Create Batch Flow: Send product_id and batch details
             payload.update({
                 'product_id': old_input.get('product_id') or None,
                 'supplier_id': old_input.get('supplier_id') or None,
@@ -103,9 +100,7 @@ def stock_movement_create(request):
                 'received_date': old_input.get('received_date') or None,
             })
         else:
-            # Stock Out Flow: Must target an existing batch
             payload['batch_id'] = old_input.get('batch_id') or None
-            # Attach supplier if returning to supplier
             if movement_type == 'return_supplier':
                 payload['supplier_id'] = old_input.get('supplier_id') or None
 
@@ -116,23 +111,31 @@ def stock_movement_create(request):
             return redirect('template-stock-movement-list')
         elif response.status_code == 400:
             errors = response.json()
-            if 'non_field_errors' in errors:
-                messages.error(request, errors['non_field_errors'][0])
-            else:
-                messages.error(request, 'Failed to record movement. Check form errors.')
+            messages.error(request, 'Failed to record movement. Check form errors.')
         else:
             messages.error(request, f'Unexpected error (Status {response.status_code}).')
 
-    # Pass data for Alpine.js dropdowns and AJAX authentication
+    # 1. Fetch Products and Suppliers
     products = fetch_all_api_data('/api/products/', token)
     suppliers = fetch_all_api_data('/api/suppliers/', token)
+
+    # 2. FIX: Pre-load ALL active batches and group them by Product ID
+    active_batches_data = fetch_all_api_data('/api/batches/?is_active=true&ordering=expiration_date', token)
+    
+    batches_by_product = {}
+    for b in active_batches_data:
+        # Ensure product ID is a string for Alpine.js dictionary lookup
+        prod_id = str(b.get('product'))
+        if prod_id not in batches_by_product:
+            batches_by_product[prod_id] = []
+        batches_by_product[prod_id].append(b)
 
     return render(request, 'stock_movements/stock_movement_form.html', {
         'errors': errors,
         'old_input': old_input,
         'products': products,
         'suppliers': suppliers,
-        'token': token, # Required for Alpine.js to fetch batches securely
+        'batches_by_product': batches_by_product, # Pass the grouped dictionary
     })
 
 

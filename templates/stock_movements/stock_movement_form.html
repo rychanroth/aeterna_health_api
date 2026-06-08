@@ -8,7 +8,7 @@
 {{ products|json_script:"products-data" }}
 {{ suppliers|json_script:"suppliers-data" }}
 {{ old_input|json_script:"old-input-data" }}
-{{ token|json_script:"api-token-data" }} <!-- Needed for secure batch fetching -->
+{{ batches_by_product|json_script:"batches-data" }} <!-- NEW: Pre-loaded batches -->
 
 <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl border border-slate-200 shadow-sm" x-data="movementForm()">
     
@@ -30,13 +30,14 @@
         <i class='bx text-xl mt-0.5' :class="isStockIn ? 'bx-check-shield' : 'bx-error-circle'"></i>
         <div>
             <p class="font-bold">Immutable Record</p>
-            <p x-text="isPurchase ? 'You are receiving new stock. A new inventory lot (Batch) will be auto-created.' : 'You are removing stock. This action is permanent and deducts from a specific Batch.'"></p>
+            <p x-text="isPurchase ? 'You are receiving new stock. A new inventory lot (Batch) will be auto-created.' : 'You are adjusting stock. This action permanently alters a specific Batch.'"></p>
         </div>
     </div>
 
     <form method="POST" class="space-y-6">
         {% csrf_token %}
         
+        <!-- Row 1: Reason & Product -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Movement Reason <span class="text-rose-500">*</span></label>
@@ -54,14 +55,12 @@
                         <option value="adjustment_out">Adjustment (Out)</option>
                     </optgroup>
                 </select>
-                <p class="text-[11px] text-gray-400 mt-1.5 font-medium">Note: 'Sale' movements are automated via POS.</p>
                 {% if errors.movement_type %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.movement_type.0 }}</p>{% endif %}
             </div>
 
-            <!-- Target Product (Used for Purchase/Stock In) -->
-            <div class="relative" @click.away="productOpen = false" x-show="isPurchase">
+            <div class="relative" @click.away="productOpen = false">
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Target Product <span class="text-rose-500">*</span></label>
-                <input type="hidden" name="product_id" :value="selectedProductId" x-show="isPurchase">
+                <input type="hidden" name="product_id" :value="isPurchase ? selectedProductId : ''">
                 
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400"><i class='bx bx-search text-lg'></i></div>
@@ -76,7 +75,6 @@
                             <div>
                                 <p class="text-sm font-bold text-gray-900 group-hover:text-slate-700" x-text="prod.name"></p>
                             </div>
-                            <!-- FIX: Use total_stock instead of stock_quantity -->
                             <span class="text-xs font-bold px-2 py-1 rounded-md"
                                   :class="prod.total_stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'"
                                   x-text="'Stock: ' + (prod.total_stock || 0)"></span>
@@ -86,25 +84,27 @@
                 </ul>
                 {% if errors.product_id %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.product_id.0 }}</p>{% endif %}
             </div>
-
-            <!-- Target Batch (Used for Stock Out) -->
-            <div x-show="!isStockIn">
-                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Target Batch <span class="text-rose-500">*</span></label>
-                <input type="hidden" name="batch_id" :value="selectedBatchId">
-                
-                <div class="relative">
-                    <select x-model="selectedBatchId" :disabled="availableBatches.length === 0" required
-                            class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-900 font-medium focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                        <option value="" disabled>Select Product First...</option>
-                        <template x-for="bat in availableBatches" :key="bat.id">
-                            <option :value="bat.id" x-text="`${bat.batch_number} (Qty: ${bat.quantity}, Exp: ${bat.expiration_date || 'N/A'})`"></option>
-                        </template>
-                    </select>
-                </div>
-                {% if errors.batch_id %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.batch_id.0 }}</p>{% endif %}
-            </div>
         </div>
 
+        <!-- Row 2: Batch Selection (For ALL reasons EXCEPT Purchase) -->
+        <div x-show="!isPurchase" x-transition>
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Target Batch <span class="text-rose-500">*</span></label>
+            <input type="hidden" name="batch_id" :value="selectedBatchId">
+            
+            <div class="relative">
+                <select x-model="selectedBatchId" :disabled="availableBatches.length === 0" required
+                        class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-900 font-medium focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                    <option value="" disabled x-text="availableBatches.length === 0 ? 'Select a product with active batches...' : 'Select a batch...'"></option>
+                    <template x-for="bat in availableBatches" :key="bat.id">
+                        <!-- FIX: Safely render batch details -->
+                        <option :value="bat.id" x-text="`${bat.batch_number || 'N/A'} (Qty: ${bat.quantity ?? 0}, Exp: ${bat.expiration_date || 'Never'})`"></option>
+                    </template>
+                </select>
+            </div>
+            {% if errors.batch_id %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.batch_id.0 }}</p>{% endif %}
+        </div>
+
+        <!-- Row 3: Quantity & Cost Price -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Quantity <span class="text-rose-500">*</span></label>
@@ -113,7 +113,6 @@
                 {% if errors.quantity %}<p class="text-rose-500 text-xs mt-1 font-medium">{{ errors.quantity.0 }}</p>{% endif %}
             </div>
 
-            <!-- Unit Cost (Replaced from StockMovement to Batch/Purchase) -->
             <div x-show="isPurchase" x-transition>
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Cost Price (per unit)</label>
                 <div class="relative">
@@ -181,7 +180,7 @@
                     class="px-8 py-3 rounded-xl text-sm font-bold text-white active:scale-[0.98] shadow-lg transition-all flex items-center gap-2"
                     :class="isStockIn ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'">
                 <i class='bx' :class="isStockIn ? 'bx-check-shield' : 'bx-minus-circle'"></i>
-                <span x-text="isPurchase ? 'Receive Stock & Create Batch' : 'Commit Stock Out'"></span>
+                <span x-text="isPurchase ? 'Receive & Create Batch' : 'Commit Movement'"></span>
             </button>
         </div>
     </form>
@@ -194,8 +193,6 @@
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
 
-<!-- ... (Keep all the HTML above the exact same as the last message) ... -->
-
 <script>
     function movementForm() {
         return {
@@ -207,35 +204,31 @@
             reference: '',
             notes: '',
 
-            // Product State
+            // Pre-loaded Data
             products: [],
+            batchesByProduct: {},
+            suppliers: [],
+
+            // Product State
             searchProduct: '',
             productOpen: false,
             selectedProductId: '',
             
-            // Batch State
+            // Batch State (Instantly populated from pre-loaded data)
             availableBatches: [],
             selectedBatchId: '',
 
             // Supplier State
-            suppliers: [],
             searchSupplier: '',
             supplierOpen: false,
             selectedSupplierId: '',
-            token: '',
 
             init() {
-                // 1. Parse Data Safely
+                // 1. Parse Injected Data
                 this.products = JSON.parse(document.getElementById('products-data')?.textContent || '[]');
                 this.suppliers = JSON.parse(document.getElementById('suppliers-data')?.textContent || '[]');
+                this.batchesByProduct = JSON.parse(document.getElementById('batches-data')?.textContent || '{}');
                 
-                // FIX: Use JSON.parse for the token to strip the double quotes added by Django's json_script
-                const tokenEl = document.getElementById('api-token-data');
-                if (tokenEl) {
-                    try { this.token = JSON.parse(tokenEl.textContent); } 
-                    catch(e) { this.token = ''; }
-                }
-
                 const oldInput = JSON.parse(document.getElementById('old-input-data')?.textContent || '{}');
 
                 // 2. Restore State
@@ -250,10 +243,11 @@
                     this.selectedProductId = oldInput.product_id;
                     const prod = this.products.find(p => String(p.id) === String(oldInput.product_id));
                     if (prod) this.searchProduct = prod.name;
+                    // Restore batches for this product
+                    this.updateAvailableBatches();
                 }
                 if (oldInput.batch_id) {
                     this.selectedBatchId = oldInput.batch_id;
-                    this.loadBatches(); 
                 }
                 if (oldInput.supplier_id) {
                     this.selectedSupplierId = oldInput.supplier_id;
@@ -284,37 +278,23 @@
                 return this.suppliers.filter(s => s.name.toLowerCase().includes(this.searchSupplier.toLowerCase()));
             },
 
-            // FIX: Robust Batch Fetching
-            async loadBatches() {
+            // FIX: Instant Batch Lookup (No AJAX)
+            updateAvailableBatches() {
                 if (!this.selectedProductId || this.isPurchase) {
                     this.availableBatches = [];
                     this.selectedBatchId = '';
                     return;
                 }
-                try {
-                    const res = await fetch(`/api/batches/?product=${this.selectedProductId}&is_active=true&ordering=expiration_date`, {
-                        headers: { 'Authorization': `Token ${this.token}` }
-                    });
-                    
-                    if (!res.ok) throw new Error(`API returned ${res.status}`);
-                    
-                    const data = await res.json();
-                    // Handle paginated or flat list responses safely
-                    this.availableBatches = data.results || data;
-                    
-                    // If the previously selected batch isn't in the new list, reset selection
-                    if (this.availableBatches.length > 0) {
-                        const exists = this.availableBatches.find(b => String(b.id) === String(this.selectedBatchId));
-                        if (!exists) {
-                            this.selectedBatchId = this.availableBatches[0].id; // Default to first
-                        }
-                    } else {
-                        this.selectedBatchId = ''; // No batches available
+                // Lookup pre-loaded batches by Product ID
+                this.availableBatches = this.batchesByProduct[String(this.selectedProductId)] || [];
+                
+                // Auto-select first batch if current selection is invalid
+                if (this.availableBatches.length > 0) {
+                    const exists = this.availableBatches.find(b => String(b.id) === String(this.selectedBatchId));
+                    if (!exists) {
+                        this.selectedBatchId = this.availableBatches[0].id;
                     }
-                } catch (e) {
-                    // Catch network errors or 401s and safely clear the list
-                    console.error("Batch load failed:", e);
-                    this.availableBatches = [];
+                } else {
                     this.selectedBatchId = '';
                 }
             },
@@ -323,8 +303,8 @@
                 this.selectedProductId = prod.id;
                 this.searchProduct = prod.name;
                 this.productOpen = false;
-                this.selectedBatchId = ''; // Reset batch selection
-                this.loadBatches();
+                this.selectedBatchId = ''; // Reset batch
+                this.updateAvailableBatches(); // Instantly populate batches
             },
             clearProduct() {
                 this.selectedProductId = '';
