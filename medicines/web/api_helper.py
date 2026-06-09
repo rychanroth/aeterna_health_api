@@ -1,23 +1,5 @@
-# medicines/web/api_helper.py
 import requests
 from django.conf import settings
-
-def _sanitize_multipart_data(data):
-    """
-    DRF strictly expects lowercase string booleans ('true'/'false') in multipart/form-data.
-    The Python requests library converts Python bools to the string 'True'/'False', which DRF rejects.
-    This helper sanitizes the payload to ensure compatibility.
-    """
-    if not data:
-        return data
-    
-    sanitized = {}
-    for key, value in data.items():
-        if isinstance(value, bool):
-            sanitized[key] = 'true' if value else 'false'
-        else:
-            sanitized[key] = value
-    return sanitized
 
 def api_call(method, endpoint, data=None, token=None, files=None):
     """
@@ -34,16 +16,12 @@ def api_call(method, endpoint, data=None, token=None, files=None):
         response = requests.get(url, headers=headers)
     elif method == 'POST':
         if files:
-            # FIX: Sanitize booleans before sending as multipart form data
-            sanitized_data = _sanitize_multipart_data(data)
-            response = requests.post(url, data=sanitized_data, files=files, headers=headers)
+            response = requests.post(url, data=data, files=files, headers=headers)
         else:
             response = requests.post(url, json=data, headers=headers)
     elif method == 'PATCH':
         if files:
-            # FIX: Sanitize booleans before sending as multipart form data
-            sanitized_data = _sanitize_multipart_data(data)
-            response = requests.patch(url, data=sanitized_data, files=files, headers=headers)
+            response = requests.patch(url, data=data, files=files, headers=headers)
         else:
             response = requests.patch(url, json=data, headers=headers)
     elif method == 'DELETE':

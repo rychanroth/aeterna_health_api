@@ -3,6 +3,7 @@ from django.contrib import messages
 from urllib.parse import urlencode
 from medicines.web.api_helper import *
 from medicines.web.decorators import * 
+from urllib.parse import urlparse, parse_qs
 
 # === Categories ===
 @login_required_template
@@ -106,44 +107,64 @@ def category_create(request):
 def category_detail(request, id):
     token = request.session.get('token')
     
+    # 1. Fetch Main Category
     cat_response = api_call('GET', f'/api/categories/{id}/', token=token)
     if cat_response.status_code != 200:
         messages.error(request, 'Category not found.')
         return redirect('template-category-list')
     category = cat_response.json()
 
-    # Fetch Ancestors (for Breadcrumbs)
+    # 2. Fetch Ancestors (for Breadcrumbs)
     anc_response = api_call('GET', f'/api/categories/{id}/ancestors/', token=token)
     ancestors = anc_response.json() if anc_response.status_code == 200 else []
 
-    # Fetch Descendants
+    # 3. Fetch Descendants
     desc_response = api_call('GET', f'/api/categories/{id}/descendants/', token=token)
     descendants = desc_response.json() if desc_response.status_code == 200 else []
 
-    # Fetch Stock Summary
+    # 4. Fetch Stock Summary
     stock_response = api_call('GET', f'/api/categories/{id}/stock_summary/', token=token)
     stock_summary = stock_response.json() if stock_response.status_code == 200 else None
 
-    # Fetch Products (Paginated)
+    # 5. Fetch Products (Paginated)
     page = request.GET.get('page', 1)
     prod_response = api_call('GET', f'/api/categories/{id}/products/?page={page}', token=token)
+    
     products = []
     next_page = prev_page = None
     count = 0
+
     if prod_response.status_code == 200:
         data = prod_response.json()
         products = data.get('results', [])
         count = data.get('count', 0)
-        if data.get('next'): next_page = data['next'].split('page=')[-1]
-        if data.get('previous'): prev_page = 1 if 'page=' not in data['previous'] else data['previous'].split('page=')[-1]
+        
+        if data.get('next'):
+            parsed_url = urlparse(data['next'])
+            next_page = parse_qs(parsed_url.query).get('page', [None])[0]
+            
+        if data.get('previous'):
+            parsed_url = urlparse(data['previous'])
+            prev_page = parse_qs(parsed_url.query).get('page', [1])[0]
+    else:
+        error_detail = "Unknown API Failure"
+        try:
+            error_detail = prod_response.json().get('detail', error_detail)
+        except Exception:
+            pass
+        messages.warning(request, f"Could not load products: {error_detail} (Status: {prod_response.status_code})")
 
+    # CRITICAL: This return statement must be present and aligned at the base function level!
     return render(request, 'categories/category_detail.html', {
         'category': category,
         'ancestors': ancestors,
         'descendants': descendants,
         'stock_summary': stock_summary,
         'products': products,
-        'next_page': next_page, 'prev_page': prev_page, 'count': count, 'current_page': page,
+        'next_page': next_page, 
+        'prev_page': prev_page, 
+        'count': count, 
+        'current_page': page,
     })
 
 

@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from medicines.core.models import Category, Product
 from medicines.api.serializers import CategorySerializer, ProductSerializer
-from medicines.api.permissions import IsAdmin
+from medicines.api.permissions import IsAdminOrPharmacist
 from drf_spectacular.utils import extend_schema, inline_serializer
 from medicines.api.filters import CategoryFilter
 
@@ -22,7 +22,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve', 'roots', 'products', 'tree', 'descendants', 'ancestors']:
             permission_classes = [IsAuthenticated]
         else:
-            permission_classes = [IsAdmin]
+            permission_classes = [IsAdminOrPharmacist]
         return [permission() for permission in permission_classes]
 
     @action(detail=False, methods=['get'])

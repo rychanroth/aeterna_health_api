@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from medicines.core.models import ProductType
 from medicines.api.serializers import ProductTypeSerializer, CategorySerializer
-from medicines.api.permissions import IsAdmin
+from medicines.api.permissions import IsAdmin, IsAdminOrPharmacist
 from medicines.api.filters import ProductTypeFilter
 
 class ProductTypeViewSet(viewsets.ModelViewSet):
@@ -16,7 +16,7 @@ class ProductTypeViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAdmin]
+            permission_classes = [IsAdminOrPharmacist]
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
